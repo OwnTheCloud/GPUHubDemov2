@@ -17,7 +17,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, Home, Package, Signal, Database, Layers, Target, Moon, Sun } from "lucide-react";
+import { ChevronDown, Home, Box, BadgeHelp, Stamp, Radio, Database, Layers, Target, Moon, Sun, Cpu, Activity } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
@@ -31,7 +31,7 @@ const menuItems = [
   {
     title: "Universal Supply",
     url: "/universal-supply",
-    icon: Package,
+    icon: Box,
   },
 ];
 
@@ -39,12 +39,12 @@ const coiSignals = [
   {
     title: "Investigation Signals",
     url: "/investigation-signals",
-    icon: Signal,
+    icon: BadgeHelp,
   },
   {
     title: "Execution Signals",
     url: "/execution-signals",
-    icon: Signal,
+    icon: Stamp,
   },
 ];
 
@@ -75,10 +75,9 @@ export default function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center justify-between p-2">
-          <span className="font-semibold text-lg">
-            {state === "collapsed" ? "GH" : "GPU Hub Demo"}
+          <span className="font-semibold text-lg flex items-center gap-2">
+            {state === "collapsed" ? <Cpu className="h-6 w-6" /> : "GPU Hub Demo"}
           </span>
-          <SidebarTrigger />
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -123,7 +122,7 @@ export default function AppSidebar() {
                 <Collapsible defaultOpen className="group/collapsible">
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton tooltip="CO+I Signals">
-                      <Signal />
+                      <Activity />
                       <span>CO+I Signals</span>
                       <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
                     </SidebarMenuButton>
@@ -149,7 +148,7 @@ export default function AppSidebar() {
                 <Collapsible defaultOpen className="group/collapsible">
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton tooltip="CSCP Signals">
-                      <Database />
+                      <Radio />
                       <span>CSCP Signals</span>
                       <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
                     </SidebarMenuButton>
@@ -184,6 +183,9 @@ export default function AppSidebar() {
               {theme === "dark" ? <Sun /> : <Moon />}
               <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
             </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarTrigger />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
