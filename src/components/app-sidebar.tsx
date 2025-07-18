@@ -14,6 +14,7 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Home, Package, Signal, Database, Layers, Target, Moon, Sun } from "lucide-react";
@@ -68,12 +69,15 @@ const cscpSignals = [
 export default function AppSidebar() {
   const location = useLocation();
   const { theme, setTheme } = useTheme();
+  const { state } = useSidebar();
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center justify-between p-2">
-          <span className="font-semibold text-lg">GPU Hub Demo</span>
+          <span className="font-semibold text-lg">
+            {state === "collapsed" ? "GH" : "GPU Hub Demo"}
+          </span>
           <SidebarTrigger />
         </div>
       </SidebarHeader>
