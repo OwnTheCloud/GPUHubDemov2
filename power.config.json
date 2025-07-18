@@ -1,0 +1,11 @@
+{
+  "appId": "848ba86e-eb12-422c-85a7-d18531f12235",
+  "appDisplayName": "GPU Hub Demo v2",
+  "description": null,
+  "environmentId": "d9089e84-51ee-e91a-b127-24b5b009040b",
+  "buildPath": "./dist",
+  "buildEntryPoint": "index.html",
+  "logoPath": "Default",
+  "localAppUrl": "http://localhost:3000/",
+  "connectionReferences": {}
+}
