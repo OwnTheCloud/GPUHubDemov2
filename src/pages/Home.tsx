@@ -32,11 +32,11 @@ const chartConfig = {
 
 export default function Home() {
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+    <div className="w-full h-full space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">GPU Deployment Dashboard</h2>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 w-full">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total GPUs Deployed</CardTitle>
@@ -74,14 +74,14 @@ export default function Home() {
           </CardContent>
         </Card>
       </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
+      <div className="flex gap-4 w-full">
+        <Card className="flex-[2] min-w-0">
           <CardHeader>
             <CardTitle>GPU Deployment Trends</CardTitle>
             <CardDescription>Monthly GPU deployments by model for the last 6 months</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig}>
+            <ChartContainer config={chartConfig} className="w-full">
               <AreaChart
                 accessibilityLayer
                 data={gpuDeploymentData}
@@ -185,7 +185,7 @@ export default function Home() {
             </ChartContainer>
           </CardContent>
         </Card>
-        <Card className="col-span-3">
+        <Card className="flex-1 min-w-0">
           <CardHeader>
             <CardTitle>Recent Deployments</CardTitle>
             <CardDescription>Latest GPU deployments across regions</CardDescription>

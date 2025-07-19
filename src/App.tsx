@@ -8,6 +8,7 @@ import { ThemeProvider } from "next-themes";
 import AppSidebar from "@/components/app-sidebar";
 import { ChatPanelProvider, useChatPanel } from "@/components/app-chatpanel";
 import AppChatPanel from "@/components/app-chatpanel";
+import { useSidebar } from "@/components/ui/sidebar";
 import Home from "@/pages/Home";
 import UniversalSupply from "@/pages/UniversalSupply";
 import InvestigationSignals from "@/pages/signals/InvestigationSignals";
@@ -19,31 +20,36 @@ import DemandIDs from "@/pages/cscp/DemandIDs";
 const queryClient = new QueryClient();
 
 function MainLayout() {
-  const { isExpanded } = useChatPanel();
+  const { isExpanded: chatExpanded } = useChatPanel();
+  const { state: sidebarState } = useSidebar();
+  
+  // Calculate dynamic margins based on both sidebar states
+  const leftMargin = sidebarState === "collapsed" ? "4rem" : "16rem"; // 64px collapsed, 256px expanded
+  const rightMargin = chatExpanded ? "24rem" : "3rem"; // 384px expanded, 48px collapsed
   
   return (
-    <div className="h-screen relative">
-      {/* Main content area that adjusts for chat panel */}
+    <div className="h-screen flex">
+      {/* Left Sidebar */}
+      <AppSidebar />
+      
+      {/* Dynamic Main Content Area */}
       <div 
-        className="h-full transition-all duration-300 ease-in-out"
+        className="flex-1 transition-all duration-300 ease-in-out"
         style={{ 
-          marginRight: isExpanded ? '384px' : '48px' 
+          marginRight: rightMargin 
         }}
       >
-        <div className="flex h-full">
-          <AppSidebar />
-          <SidebarInset className="flex-1">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/universal-supply" element={<UniversalSupply />} />
-              <Route path="/investigation-signals" element={<InvestigationSignals />} />
-              <Route path="/execution-signals" element={<ExecutionSignals />} />
-              <Route path="/datacenters" element={<Datacenters />} />
-              <Route path="/stamps" element={<Stamps />} />
-              <Route path="/demand-ids" element={<DemandIDs />} />
-            </Routes>
-          </SidebarInset>
-        </div>
+        <SidebarInset className="w-full h-full">
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/universal-supply" element={<UniversalSupply />} />
+            <Route path="/investigation-signals" element={<InvestigationSignals />} />
+            <Route path="/execution-signals" element={<ExecutionSignals />} />
+            <Route path="/datacenters" element={<Datacenters />} />
+            <Route path="/stamps" element={<Stamps />} />
+            <Route path="/demand-ids" element={<DemandIDs />} />
+          </Routes>
+        </SidebarInset>
       </div>
       
       {/* Chat panel positioned absolutely on the right */}
