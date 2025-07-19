@@ -81,7 +81,7 @@ export default function Home() {
             <CardDescription>Monthly GPU deployments by model for the last 6 months</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="w-full">
+            <ChartContainer config={chartConfig} className="w-full h-[300px]">
               <AreaChart
                 accessibilityLayer
                 data={gpuDeploymentData}

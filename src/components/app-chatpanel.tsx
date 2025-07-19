@@ -78,7 +78,7 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
   return (
     <div
       className={cn(
-        "h-full transition-all duration-300 ease-in-out border-l border-sidebar-border bg-sidebar-background",
+        "h-full transition-all duration-300 ease-in-out border-l border-sidebar-border bg-sidebar text-sidebar-foreground",
         isExpanded ? "w-96" : "w-12",
         className
       )}
@@ -133,7 +133,7 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
 
           {/* Chat Content */}
           <div className="flex-1 overflow-hidden p-2">
-            <div className="h-full bg-background border border-sidebar-border rounded-lg">
+            <div className="h-full bg-card border border-sidebar-border rounded-lg">
               <Chat
                 messages={messages}
                 input={input}
