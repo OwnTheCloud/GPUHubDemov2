@@ -1,7 +1,5 @@
 import { DataTable } from "@/components/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { Button } from "@/components/ui/button";
-import { ArrowUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 type GPUStamp = {
@@ -155,17 +153,7 @@ const columns: ColumnDef<GPUStamp>[] = [
   },
   {
     accessorKey: "name",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: "Name",
   },
   {
     accessorKey: "datacenter",
@@ -195,17 +183,7 @@ const columns: ColumnDef<GPUStamp>[] = [
   },
   {
     accessorKey: "totalGPUs",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Total GPUs
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: "Total GPUs",
   },
   {
     accessorKey: "allocatedGPUs",
@@ -273,7 +251,7 @@ export default function Stamps() {
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">GPU Deployment Stamps</h2>
       </div>
-      <DataTable columns={columns} data={data} searchKey="name" />
+      <DataTable columns={columns} data={data} />
     </div>
   );
 }

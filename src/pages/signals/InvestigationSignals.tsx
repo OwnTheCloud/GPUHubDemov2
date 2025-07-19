@@ -1,7 +1,5 @@
 import { DataTable } from "@/components/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { Button } from "@/components/ui/button";
-import { ArrowUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 type InvestigationSignal = {
@@ -103,17 +101,7 @@ const columns: ColumnDef<InvestigationSignal>[] = [
   },
   {
     accessorKey: "timestamp",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Timestamp
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: "Timestamp",
   },
   {
     accessorKey: "severity",
@@ -173,17 +161,7 @@ const columns: ColumnDef<InvestigationSignal>[] = [
   },
   {
     accessorKey: "affectedGPUs",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Affected GPUs
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: "Affected GPUs",
   },
   {
     accessorKey: "status",
@@ -215,7 +193,7 @@ export default function InvestigationSignals() {
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">GPU Investigation Signals</h2>
       </div>
-      <DataTable columns={columns} data={data} searchKey="datacenter" />
+      <DataTable columns={columns} data={data} />
     </div>
   );
 }

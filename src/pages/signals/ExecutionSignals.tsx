@@ -1,7 +1,5 @@
 import { DataTable } from "@/components/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { Button } from "@/components/ui/button";
-import { ArrowUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 type ExecutionSignal = {
@@ -118,17 +116,7 @@ const columns: ColumnDef<ExecutionSignal>[] = [
   },
   {
     accessorKey: "timestamp",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Timestamp
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: "Timestamp",
   },
   {
     accessorKey: "action",
@@ -162,17 +150,7 @@ const columns: ColumnDef<ExecutionSignal>[] = [
   },
   {
     accessorKey: "gpuCount",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          GPU Count
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: "GPU Count",
   },
   {
     accessorKey: "duration",
@@ -210,7 +188,7 @@ export default function ExecutionSignals() {
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">GPU Execution Signals</h2>
       </div>
-      <DataTable columns={columns} data={data} searchKey="datacenter" />
+      <DataTable columns={columns} data={data} />
     </div>
   );
 }

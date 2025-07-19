@@ -1,7 +1,5 @@
 import { DataTable } from "@/components/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { Button } from "@/components/ui/button";
-import { ArrowUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 type Datacenter = {
@@ -145,17 +143,7 @@ const columns: ColumnDef<Datacenter>[] = [
   },
   {
     accessorKey: "name",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: "Name",
   },
   {
     accessorKey: "region",
@@ -183,17 +171,7 @@ const columns: ColumnDef<Datacenter>[] = [
   },
   {
     accessorKey: "gpuCapacity",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          GPU Capacity
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: "GPU Capacity",
   },
   {
     accessorKey: "deployedGPUs",
@@ -245,7 +223,7 @@ export default function Datacenters() {
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">GPU Datacenters</h2>
       </div>
-      <DataTable columns={columns} data={data} searchKey="name" />
+      <DataTable columns={columns} data={data} />
     </div>
   );
 }

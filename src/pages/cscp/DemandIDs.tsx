@@ -1,7 +1,5 @@
 import { DataTable } from "@/components/data-table";
 import { ColumnDef } from "@tanstack/react-table";
-import { Button } from "@/components/ui/button";
-import { ArrowUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 type GPUDemandID = {
@@ -154,17 +152,7 @@ const columns: ColumnDef<GPUDemandID>[] = [
   },
   {
     accessorKey: "customerName",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Customer
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: "Customer",
   },
   {
     accessorKey: "gpuType",
@@ -190,17 +178,7 @@ const columns: ColumnDef<GPUDemandID>[] = [
   },
   {
     accessorKey: "quantity",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Quantity
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: "Quantity",
   },
   {
     accessorKey: "preferredRegion",
@@ -288,7 +266,7 @@ export default function DemandIDs() {
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">GPU Demand Requests</h2>
       </div>
-      <DataTable columns={columns} data={data} searchKey="customerName" />
+      <DataTable columns={columns} data={data} />
     </div>
   );
 }
