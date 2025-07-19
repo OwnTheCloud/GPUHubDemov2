@@ -78,6 +78,7 @@ export default function AppSidebar() {
           <span className="font-semibold text-lg flex items-center gap-2">
             {state === "collapsed" ? <Cpu className="h-6 w-6" /> : "GPU Hub Demo"}
           </span>
+          <SidebarTrigger />
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -183,9 +184,6 @@ export default function AppSidebar() {
               {theme === "dark" ? <Sun /> : <Moon />}
               <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
             </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarTrigger />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

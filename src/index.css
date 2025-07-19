@@ -111,3 +111,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .writing-mode-vertical-lr {
+    writing-mode: vertical-lr;
+  }
+}
