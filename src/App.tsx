@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, HashRouter } from "react-router-dom";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { ThemeProvider } from "next-themes";
 import AppSidebar from "@/components/app-sidebar";
@@ -44,6 +44,7 @@ function MainLayout() {
             <Route path="/datacenters" element={<Datacenters />} />
             <Route path="/stamps" element={<Stamps />} />
             <Route path="/demand-ids" element={<DemandIDs />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </SidebarInset>
       </div>
@@ -56,22 +57,29 @@ function MainLayout() {
   );
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <ChatPanelProvider>
-            <SidebarProvider>
-              <MainLayout />
-            </SidebarProvider>
-          </ChatPanelProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  // Use HashRouter for Power Platform compatibility
+  const Router = typeof window !== 'undefined' && window.location.hostname.includes('powerapps.com') 
+    ? HashRouter 
+    : BrowserRouter;
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <Router>
+            <ChatPanelProvider>
+              <SidebarProvider>
+                <MainLayout />
+              </SidebarProvider>
+            </ChatPanelProvider>
+          </Router>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
