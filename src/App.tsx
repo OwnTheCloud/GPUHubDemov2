@@ -23,23 +23,19 @@ function MainLayout() {
   const { isExpanded: chatExpanded } = useChatPanel();
   const { state: sidebarState } = useSidebar();
   
-  // Calculate dynamic margins based on both sidebar states
-  const leftMargin = sidebarState === "collapsed" ? "4rem" : "16rem"; // 64px collapsed, 256px expanded
-  const rightMargin = chatExpanded ? "24rem" : "3rem"; // 384px expanded, 48px collapsed
-  
   return (
-    <div className="h-screen flex">
+    <div className="h-screen flex relative">
       {/* Left Sidebar */}
       <AppSidebar />
       
-      {/* Dynamic Main Content Area */}
-      <div 
-        className="flex-1 transition-all duration-300 ease-in-out"
-        style={{ 
-          marginRight: rightMargin 
-        }}
-      >
-        <SidebarInset className="w-full h-full">
+      {/* Dynamic Main Content Area - fills available space between sidebars */}
+      <div className="flex-1 overflow-hidden">
+        <SidebarInset 
+          className="w-full h-full transition-all duration-300 ease-in-out"
+          style={{
+            paddingRight: chatExpanded ? "24rem" : "3rem"
+          }}
+        >
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/universal-supply" element={<UniversalSupply />} />
