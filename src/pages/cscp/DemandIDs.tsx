@@ -266,7 +266,7 @@ export default function DemandIDs() {
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">GPU Demand Requests</h2>
       </div>
-      <DataTable columns={columns} data={data} />
+      <DataTable columns={columns} data={data} editable={true} />
     </div>
   );
 }

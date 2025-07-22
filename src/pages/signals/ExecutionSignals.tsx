@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { DataTable } from "@/components/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
+import { EditableCell } from "@/components/ui/editable-cell";
+import { useAutoSave } from "@/hooks/use-auto-save";
 
 type ExecutionSignal = {
   id: string;
@@ -14,7 +17,7 @@ type ExecutionSignal = {
   status: "Pending" | "Running" | "Completed" | "Failed" | "Cancelled";
 };
 
-const data: ExecutionSignal[] = [
+const initialData: ExecutionSignal[] = [
   {
     id: "EXE001",
     jobId: "GPU-DEPLOY-2024-0718-001",
@@ -105,7 +108,25 @@ const data: ExecutionSignal[] = [
   },
 ];
 
-const columns: ColumnDef<ExecutionSignal>[] = [
+const gpuTypeOptions = [
+  { value: "A100", label: "A100", variant: "destructive" as const },
+  { value: "H100", label: "H100", variant: "outline" as const },
+  { value: "H200", label: "H200", variant: "secondary" as const },
+  { value: "GB200", label: "GB200", variant: "default" as const },
+];
+
+const statusOptions = [
+  { value: "Pending", label: "Pending", variant: "secondary" as const },
+  { value: "Running", label: "Running", variant: "outline" as const },
+  { value: "Completed", label: "Completed", variant: "default" as const },
+  { value: "Failed", label: "Failed", variant: "destructive" as const },
+  { value: "Cancelled", label: "Cancelled", variant: "destructive" as const },
+];
+
+const createColumns = (
+  onSave: (rowId: string, field: string, value: unknown) => void,
+  isLoading: boolean
+): ColumnDef<ExecutionSignal>[] => [
   {
     accessorKey: "id",
     header: "Signal ID",
@@ -129,8 +150,21 @@ const columns: ColumnDef<ExecutionSignal>[] = [
   {
     accessorKey: "gpuType",
     header: "GPU Type",
-    cell: ({ row }) => {
+    cell: ({ row, editable, onSave: cellOnSave, isLoading: cellIsLoading }) => {
       const gpuType = row.getValue("gpuType") as string;
+      
+      if (editable && cellOnSave) {
+        return (
+          <EditableCell
+            value={gpuType}
+            type="select"
+            options={gpuTypeOptions}
+            onSave={cellOnSave}
+            isLoading={cellIsLoading}
+          />
+        );
+      }
+      
       return (
         <Badge
           variant={
@@ -159,8 +193,21 @@ const columns: ColumnDef<ExecutionSignal>[] = [
   {
     accessorKey: "status",
     header: "Status",
-    cell: ({ row }) => {
+    cell: ({ row, editable, onSave: cellOnSave, isLoading: cellIsLoading }) => {
       const status = row.getValue("status") as string;
+      
+      if (editable && cellOnSave) {
+        return (
+          <EditableCell
+            value={status}
+            type="select"
+            options={statusOptions}
+            onSave={cellOnSave}
+            isLoading={cellIsLoading}
+          />
+        );
+      }
+      
       return (
         <Badge
           variant={
@@ -183,12 +230,43 @@ const columns: ColumnDef<ExecutionSignal>[] = [
 ];
 
 export default function ExecutionSignals() {
+  const [data, setData] = useState<ExecutionSignal[]>(initialData);
+
+  const mockSaveFunction = async (rowId: string, field: string, value: unknown) => {
+    console.log(`Saving ${field} = ${value} for row ${rowId}`);
+    
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Update local state
+    setData(prevData => 
+      prevData.map(item => 
+        item.id === rowId 
+          ? { ...item, [field]: value }
+          : item
+      )
+    );
+  };
+
+  const { save, isLoading } = useAutoSave({
+    onSave: mockSaveFunction,
+    delay: 500,
+  });
+
+  const columns = createColumns(save, isLoading);
+
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">GPU Execution Signals</h2>
       </div>
-      <DataTable columns={columns} data={data} />
+      <DataTable 
+        columns={columns} 
+        data={data} 
+        editable={true}
+        onCellUpdate={save}
+        isUpdating={isLoading}
+      />
     </div>
   );
 }

@@ -10,7 +10,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, Download, Trash2, ArrowUpDown } from "lucide-react";
+import { EditableCell } from "@/components/ui/editable-cell";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -40,6 +41,9 @@ interface DataTableProps<TData, TValue> {
   enableBulkActions?: boolean;
   onExport?: (selectedRows: TData[]) => void;
   onDelete?: (selectedRows: TData[]) => void;
+  editable?: boolean;
+  onCellUpdate?: (rowId: string, field: string, value: unknown) => Promise<void>;
+  isUpdating?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -49,12 +53,44 @@ export function DataTable<TData, TValue>({
   enableBulkActions = true,
   onExport,
   onDelete,
+  editable = false,
+  onCellUpdate,
+  isUpdating = false,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
   const [globalFilter, setGlobalFilter] = useState("");
+  const [updatingCells, setUpdatingCells] = useState<Set<string>>(new Set());
+
+  const handleCellUpdate = useCallback(
+    async (rowId: string, field: string, value: unknown) => {
+      if (!onCellUpdate) return;
+
+      const cellKey = `${rowId}-${field}`;
+      setUpdatingCells(prev => new Set(prev).add(cellKey));
+
+      try {
+        await onCellUpdate(rowId, field, value);
+      } finally {
+        setUpdatingCells(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(cellKey);
+          return newSet;
+        });
+      }
+    },
+    [onCellUpdate]
+  );
+
+  const isCellUpdating = useCallback(
+    (rowId: string, field: string) => {
+      const cellKey = `${rowId}-${field}`;
+      return updatingCells.has(cellKey);
+    },
+    [updatingCells]
+  );
 
   // Add selection column if row selection is enabled
   const selectionColumn: ColumnDef<TData, TValue> = {
@@ -87,23 +123,20 @@ export function DataTable<TData, TValue>({
     ? [selectionColumn, ...columns]
     : columns;
 
-  // Add sorting to all columns that don't already have it
+  // Add sorting to all columns that don't already have it and wrap with editable logic
   const sortableColumns = enhancedColumns.map((column) => {
     // Check if column already has a custom header or is the select column
     if ('id' in column && column.id === "select") {
       return column;
     }
-    if (typeof column.header === "function") {
-      return column;
-    }
     
-    // Add sorting header to columns that don't have one
     const accessorKey = 'accessorKey' in column ? column.accessorKey as string : '';
     const headerText = typeof column.header === "string" ? column.header : accessorKey;
     
-    return {
+    // Create enhanced column with sorting and editable logic
+    const enhancedColumn = {
       ...column,
-      header: ({ column: sortCol }) => (
+      header: typeof column.header === "function" ? column.header : ({ column: sortCol }) => (
         <Button
           variant="ghost"
           onClick={() => sortCol.toggleSorting(sortCol.getIsSorted() === "asc")}
@@ -114,6 +147,40 @@ export function DataTable<TData, TValue>({
         </Button>
       ),
     };
+
+    // If editable, wrap or create cell function with editable logic
+    if (editable && column.id !== "select") {
+      const originalCell = column.cell;
+      enhancedColumn.cell = (cellContext) => {
+        const rowId = (cellContext.row.original as Record<string, unknown>).id as string || cellContext.row.id;
+        const fieldName = cellContext.column.id;
+        const cellIsUpdating = isCellUpdating(rowId, fieldName);
+        
+        if (originalCell && typeof originalCell === 'function') {
+          // Call the original cell function with enhanced context
+          return originalCell({
+            ...cellContext,
+            editable: true,
+            onSave: (value: unknown) => handleCellUpdate(rowId, fieldName, value),
+            isLoading: cellIsUpdating,
+          } as any);
+        } else {
+          // Create a default editable cell for columns without custom cell functions
+          const value = cellContext.getValue();
+          return (
+            <EditableCell
+              value={value}
+              type="text"
+              onSave={(newValue: unknown) => handleCellUpdate(rowId, fieldName, newValue)}
+              isLoading={cellIsUpdating}
+              placeholder={`Enter ${fieldName}...`}
+            />
+          );
+        }
+      };
+    }
+    
+    return enhancedColumn;
   }) as ColumnDef<TData, TValue>[];
 
   const table = useReactTable({
@@ -271,7 +338,7 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length}
+                  colSpan={enableRowSelection ? columns.length + 1 : columns.length}
                   className="h-24 text-center"
                 >
                   No results.
