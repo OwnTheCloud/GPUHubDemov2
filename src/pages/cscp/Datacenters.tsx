@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { DataTable } from "@/components/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
+import { EditableCell } from "@/components/ui/editable-cell";
+import { useAutoSave } from "@/hooks/use-auto-save";
 
 type Datacenter = {
   id: string;
@@ -16,7 +19,7 @@ type Datacenter = {
   status: "Online" | "Maintenance" | "Offline" | "Commissioning";
 };
 
-const data: Datacenter[] = [
+const initialData: Datacenter[] = [
   {
     id: "DC001",
     name: "Virginia Prime",
@@ -136,7 +139,23 @@ const data: Datacenter[] = [
   },
 ];
 
-const columns: ColumnDef<Datacenter>[] = [
+const typeOptions = [
+  { value: "Owned", label: "Owned", variant: "default" as const },
+  { value: "Colocation", label: "Colocation", variant: "secondary" as const },
+  { value: "Edge", label: "Edge", variant: "outline" as const },
+];
+
+const statusOptions = [
+  { value: "Online", label: "Online", variant: "default" as const },
+  { value: "Maintenance", label: "Maintenance", variant: "outline" as const },
+  { value: "Commissioning", label: "Commissioning", variant: "secondary" as const },
+  { value: "Offline", label: "Offline", variant: "destructive" as const },
+];
+
+const createColumns = (
+  onSave: (rowId: string, field: string, value: unknown) => void,
+  isLoading: boolean
+): ColumnDef<Datacenter>[] => [
   {
     accessorKey: "id",
     header: "DC ID",
@@ -152,8 +171,21 @@ const columns: ColumnDef<Datacenter>[] = [
   {
     accessorKey: "type",
     header: "Type",
-    cell: ({ row }) => {
+    cell: ({ row, editable, onSave: cellOnSave, isLoading: cellIsLoading }) => {
       const type = row.getValue("type") as string;
+      
+      if (editable && cellOnSave) {
+        return (
+          <EditableCell
+            value={type}
+            type="select"
+            options={typeOptions}
+            onSave={cellOnSave}
+            isLoading={cellIsLoading}
+          />
+        );
+      }
+      
       return (
         <Badge
           variant={
@@ -196,8 +228,21 @@ const columns: ColumnDef<Datacenter>[] = [
   {
     accessorKey: "status",
     header: "Status",
-    cell: ({ row }) => {
+    cell: ({ row, editable, onSave: cellOnSave, isLoading: cellIsLoading }) => {
       const status = row.getValue("status") as string;
+      
+      if (editable && cellOnSave) {
+        return (
+          <EditableCell
+            value={status}
+            type="select"
+            options={statusOptions}
+            onSave={cellOnSave}
+            isLoading={cellIsLoading}
+          />
+        );
+      }
+      
       return (
         <Badge
           variant={
@@ -218,12 +263,41 @@ const columns: ColumnDef<Datacenter>[] = [
 ];
 
 export default function Datacenters() {
+  const [data, setData] = useState<Datacenter[]>(initialData);
+
+  const mockSaveFunction = async (rowId: string, field: string, value: unknown) => {
+    console.log(`Saving ${field} = ${value} for row ${rowId}`);
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    setData(prevData => 
+      prevData.map(item => 
+        item.id === rowId 
+          ? { ...item, [field]: value }
+          : item
+      )
+    );
+  };
+
+  const { save, isLoading } = useAutoSave({
+    onSave: mockSaveFunction,
+    delay: 500,
+  });
+
+  const columns = createColumns(save, isLoading);
+
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">GPU Datacenters</h2>
       </div>
-      <DataTable columns={columns} data={data} />
+      <DataTable 
+        columns={columns} 
+        data={data} 
+        editable={true}
+        onCellUpdate={save}
+        isUpdating={isLoading}
+      />
     </div>
   );
 }

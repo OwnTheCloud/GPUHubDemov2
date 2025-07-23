@@ -1,8 +1,8 @@
 {
-  "appId": "848ba86e-eb12-422c-85a7-d18531f12235",
-  "appDisplayName": "GPU Hub Demo v2",
+  "appId": "d75903ae-bd8b-48b4-b86d-4810eed3f746",
+  "appDisplayName": "GPUHubDemov2",
   "description": null,
-  "environmentId": "d9089e84-51ee-e91a-b127-24b5b009040b",
+  "environmentId": "08d661af-022e-ef6a-88c3-50f55b186209",
   "buildPath": "./dist",
   "buildEntryPoint": "index.html",
   "logoPath": "Default",
