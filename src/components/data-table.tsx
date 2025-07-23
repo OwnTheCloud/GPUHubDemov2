@@ -142,14 +142,35 @@ export function DataTable<TData, TValue>({
 
   const selectedRows = table.getFilteredSelectedRowModel().rows.map(row => row.original);
 
+  const convertToCSV = (data: Record<string, unknown>[]): string => {
+    if (data.length === 0) return '';
+    
+    const headers = Object.keys(data[0]);
+    const csvHeaders = headers.join(',');
+    
+    const csvRows = data.map(row => 
+      headers.map(header => {
+        const value = row[header];
+        const stringValue = value === null || value === undefined ? '' : String(value);
+        // Escape quotes and wrap in quotes if contains comma, quote, or newline
+        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+          return `"${stringValue.replace(/"/g, '""')}"`;
+        }
+        return stringValue;
+      }).join(',')
+    );
+    
+    return [csvHeaders, ...csvRows].join('\n');
+  };
+
   const handleExport = () => {
     if (onExport) {
       onExport(selectedRows);
     } else {
       // Default export functionality
-      const dataStr = JSON.stringify(selectedRows, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-      const exportFileDefaultName = 'table-data.json';
+      const csvData = convertToCSV(selectedRows as Record<string, unknown>[]);
+      const dataUri = 'data:text/csv;charset=utf-8,'+ encodeURIComponent(csvData);
+      const exportFileDefaultName = 'table-data.csv';
       const linkElement = document.createElement('a');
       linkElement.setAttribute('href', dataUri);
       linkElement.setAttribute('download', exportFileDefaultName);
