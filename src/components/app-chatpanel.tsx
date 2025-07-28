@@ -53,7 +53,7 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
     append,
     error,
   } = useChat({
-    api: `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3333'}/api/chat`,
+    api: '/api/chat',
     onError: (error) => {
       console.error("Chat error:", error);
     },
