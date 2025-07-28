@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
     "dev:power": "start vite && start pac code run",
-    "server": "node api-server.js",
+    "server": "node simple-api-server.js",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
