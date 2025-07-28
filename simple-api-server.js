@@ -38,37 +38,68 @@ const server = createServer(async (req, res) => {
       // Check API key
       const apiKey = process.env.VITE_OPENAI_API_KEY;
       if (!apiKey || apiKey === 'your_openai_api_key_here') {
+        console.error('❌ OpenAI API key not configured');
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'OpenAI API key not configured' }));
         return;
       }
+      
+      // Validate API key format
+      if (!apiKey.startsWith('sk-')) {
+        console.error('❌ Invalid OpenAI API key format:', apiKey.substring(0, 10) + '...');
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid OpenAI API key format' }));
+        return;
+      }
+      
+      console.log('✅ OpenAI API key validated:', apiKey.substring(0, 10) + '...');
 
       // Configure model
       const model = openai(process.env.VITE_OPENAI_MODEL || 'gpt-4o-mini', {
         apiKey
       });
 
+      // Clean messages - OpenAI only wants role and content
+      const cleanMessages = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
       // Add system message
       const messagesWithSystem = [
         { role: 'system', content: systemPrompt },
-        ...messages
+        ...cleanMessages
       ];
 
-      console.log('Calling OpenAI with messages:', messagesWithSystem.length);
+      console.log('Original messages:', JSON.stringify(messages, null, 2));
+      console.log('Cleaned messages for OpenAI:', JSON.stringify(messagesWithSystem, null, 2));
 
       // Generate streaming response
-      const result = streamText({
-        model,
-        messages: messagesWithSystem,
-        temperature: 0.7,
-        maxTokens: 1000,
-      });
-
-      console.log('Got result from streamText');
+      console.log('Calling streamText with OpenAI...');
+      let result;
+      try {
+        result = streamText({
+          model,
+          messages: messagesWithSystem,
+          temperature: 0.7,
+          maxTokens: 1000,
+        });
+        console.log('✅ streamText call succeeded');
+      } catch (error) {
+        console.error('❌ streamText failed:', error);
+        throw error;
+      }
 
       // Convert to data stream response
-      const response = await result.toDataStreamResponse();
-      console.log('Converted to data stream response');
+      console.log('Converting to data stream response...');
+      let response;
+      try {
+        response = await result.toDataStreamResponse();
+        console.log('✅ Data stream response created');
+      } catch (error) {
+        console.error('❌ toDataStreamResponse failed:', error);
+        throw error;
+      }
 
       // Set headers from the response
       for (const [key, value] of response.headers.entries()) {
