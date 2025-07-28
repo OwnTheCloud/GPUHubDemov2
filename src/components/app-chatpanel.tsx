@@ -4,6 +4,7 @@ import { MessageCircle, X, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Chat } from "@/components/ui/chat";
 import { cn } from "@/lib/utils";
+import { createChatCompletion } from "@/api/chat";
 
 // Context for chat panel state
 interface ChatPanelContextType {
@@ -42,7 +43,7 @@ interface AppChatPanelProps {
 export default function AppChatPanel({ className }: AppChatPanelProps) {
   const { isExpanded, toggleExpanded } = useChatPanel();
   
-  // Initialize chat functionality (without API for now)
+  // Initialize chat functionality with OpenAI API
   const {
     messages,
     input,
@@ -51,17 +52,25 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
     isLoading,
     stop,
     append,
+    error,
   } = useChat({
-    // Will be implemented later when API is ready
+    async api({ messages }) {
+      try {
+        const result = await createChatCompletion(messages);
+        return result.toAIStreamResponse();
+      } catch (error) {
+        console.error("Chat API error:", error);
+        throw error;
+      }
+    },
     onError: (error) => {
       console.error("Chat error:", error);
     },
-    // Add some initial mock functionality
     initialMessages: [
       {
         id: "welcome",
         role: "assistant",
-        content: "Hello! I'm your GPU Assistant. I can help you analyze your GPU deployments, power consumption, and performance metrics. Ask me about your datacenters, GPU utilization, or any signals you're seeing.\n\n*Note: API integration will be added in a future update.*",
+        content: "Hello! I'm your GPU Assistant. I can help you analyze your GPU deployments, power consumption, and performance metrics. Ask me about your datacenters, GPU utilization, or any signals you're seeing.",
       },
     ],
   });
@@ -134,6 +143,16 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
           {/* Chat Content */}
           <div className="flex-1 overflow-hidden p-2">
             <div className="h-full bg-card border border-sidebar-border rounded-lg">
+              {error && (
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
+                  <p className="text-red-800 dark:text-red-200 text-sm">
+                    {error.message.includes('API key') 
+                      ? 'OpenAI API key not configured. Please check your .env.local file.'
+                      : 'Chat error: ' + error.message
+                    }
+                  </p>
+                </div>
+              )}
               <Chat
                 messages={messages}
                 input={input}
