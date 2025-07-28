@@ -108,13 +108,25 @@ const server = createServer(async (req, res) => {
 
       res.writeHead(response.status || 200);
 
-      // Stream the response body
+      // Stream the response body with logging
       if (response.body) {
         const reader = response.body.getReader();
+        let chunkCount = 0;
         try {
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
+            if (done) {
+              console.log(`📤 Stream complete. Sent ${chunkCount} chunks.`);
+              break;
+            }
+            
+            chunkCount++;
+            // Log the first few chunks to see what we're sending
+            if (chunkCount <= 3) {
+              const chunkText = new TextDecoder().decode(value);
+              console.log(`📤 Chunk ${chunkCount}:`, chunkText.slice(0, 100) + (chunkText.length > 100 ? '...' : ''));
+            }
+            
             res.write(value);
           }
         } finally {
@@ -122,6 +134,7 @@ const server = createServer(async (req, res) => {
           res.end();
         }
       } else {
+        console.log('⚠️ No response body to stream');
         res.end();
       }
 
