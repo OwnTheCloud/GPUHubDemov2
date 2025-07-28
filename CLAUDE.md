@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Local Development
 - `npm run dev` - Start Vite development server at http://localhost:3000
+- `npm run dev:full` - Start both API server (port 3333) and Vite dev server (port 3000)
+- `npm run server` - Start Express API server only (port 3333)
 - `npm run build` - Build for production 
 - `npm run lint` - Run ESLint
 - `npm run preview` - Preview production build
@@ -14,6 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 1. Get API key from https://platform.openai.com/api-keys
 2. Set `VITE_OPENAI_API_KEY=your_api_key` in `.env.local`
 3. Optionally set `VITE_OPENAI_MODEL=gpt-4-turbo` for different model
+4. Run `npm run dev:full` to start both frontend and API server
 
 ### Power Platform Development
 - `npm run dev:power` - Start both Vite and PAC code servers (Windows only)
@@ -144,7 +147,7 @@ Power Platform SDK is initialized once in PowerProvider. For data connections:
 ```
 src/
 ├── api/
-│   └── chat.ts             # OpenAI API integration
+│   └── chat.ts             # OpenAI API integration (legacy)
 ├── components/
 │   ├── ui/                 # ShadCN components (auto-generated)
 │   ├── app-sidebar.tsx     # Main navigation component  
@@ -176,7 +179,8 @@ src/
 │   └── asset.ts           # Asset type definitions
 ├── App.tsx               # Provider setup and routing
 ├── main.tsx              # Entry point with PowerProvider
-└── PowerProvider.tsx     # Power Platform SDK initialization
+├── PowerProvider.tsx     # Power Platform SDK initialization
+└── server.js             # Express API server for OpenAI integration
 ```
 
 ## Important Notes

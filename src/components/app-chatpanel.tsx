@@ -4,7 +4,6 @@ import { MessageCircle, X, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Chat } from "@/components/ui/chat";
 import { cn } from "@/lib/utils";
-import { createChatCompletion } from "@/api/chat";
 
 // Context for chat panel state
 interface ChatPanelContextType {
@@ -54,15 +53,7 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
     append,
     error,
   } = useChat({
-    async api({ messages }) {
-      try {
-        const result = await createChatCompletion(messages);
-        return result.toAIStreamResponse();
-      } catch (error) {
-        console.error("Chat API error:", error);
-        throw error;
-      }
-    },
+    api: `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3333'}/api/chat`,
     onError: (error) => {
       console.error("Chat error:", error);
     },
