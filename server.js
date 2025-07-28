@@ -52,41 +52,60 @@ app.post('/api/chat', async (req, res) => {
       ...messages
     ];
 
-    const result = await streamText({
+    const result = streamText({
       model,
       messages: messagesWithSystem,
       temperature: 0.7,
       maxTokens: 1000,
     });
 
-    // Convert the stream to the format expected by useChat
-    const response = await result.toDataStreamResponse();
+    // Return the streaming response directly
+    const response = result.toDataStreamResponse();
     
-    // Set appropriate headers
-    res.setHeader('Content-Type', 'text/plain');
-    res.setHeader('Transfer-Encoding', 'chunked');
+    // Wait for the response and pipe it
+    const streamResponse = await response;
     
-    // Stream the response
-    const reader = response.body?.getReader();
-    if (reader) {
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          res.write(value);
+    // Set the correct headers
+    streamResponse.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
+    
+    // Set status
+    res.status(streamResponse.status || 200);
+    
+    // Handle the stream
+    if (streamResponse.body) {
+      const stream = streamResponse.body;
+      const reader = stream.getReader();
+      
+      const pump = async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              res.end();
+              break;
+            }
+            res.write(value);
+          }
+        } catch (error) {
+          console.error('Stream error:', error);
+          res.end();
         }
-      } finally {
-        reader.releaseLock();
-      }
+      };
+      
+      await pump();
+    } else {
+      res.end();
     }
-    
-    res.end();
   } catch (error) {
     console.error('Chat API error:', error);
-    res.status(500).json({ 
-      error: 'Failed to process chat request',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        error: 'Failed to process chat request',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }
 });
 
