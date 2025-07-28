@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
+    "dev:full": "./start-dev.sh",
     "dev:power": "start vite && start pac code run",
     "server": "node simple-api-server.js",
     "build": "vite build",
