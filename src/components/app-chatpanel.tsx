@@ -1,9 +1,10 @@
 import { useState, useCallback, createContext, useContext } from "react";
-import { useChat } from "ai/react";
-import { MessageCircle, X, Cpu } from "lucide-react";
+import { MessageCircle, X, Cpu, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Chat } from "@/components/ui/chat";
 import { cn } from "@/lib/utils";
+import { useEnvironmentAwareChat } from "@/hooks/use-environment-aware-chat";
+import { getEnvironmentInfo } from "@/lib/environment";
 
 // Context for chat panel state
 interface ChatPanelContextType {
@@ -41,8 +42,9 @@ interface AppChatPanelProps {
 
 export default function AppChatPanel({ className }: AppChatPanelProps) {
   const { isExpanded, toggleExpanded } = useChatPanel();
+  const environmentInfo = getEnvironmentInfo();
   
-  // Initialize chat functionality with OpenAI API
+  // Initialize environment-aware chat functionality
   const {
     messages,
     input,
@@ -52,8 +54,8 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
     stop,
     append,
     error,
-  } = useChat({
-    api: '/api/chat',
+    isUsingClientSide,
+  } = useEnvironmentAwareChat({
     onError: (error) => {
       console.error("Chat error:", error);
     },
@@ -62,6 +64,7 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
         id: "welcome",
         role: "assistant",
         content: "Hello! I'm your GPU Assistant. I can help you analyze your GPU deployments, power consumption, and performance metrics. Ask me about your datacenters, GPU utilization, or any signals you're seeing.",
+        createdAt: new Date(),
       },
     ],
   });
@@ -114,9 +117,19 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
                 <Cpu className="h-4 w-4 text-sidebar-primary" />
               </div>
               <div>
-                <h3 className="font-semibold text-sm text-sidebar-foreground">GPU Assistant</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-sm text-sidebar-foreground">GPU Assistant</h3>
+                  {isUsingClientSide ? (
+                    <Wifi className="h-3 w-3 text-blue-500" title="Power Platform Mode" />
+                  ) : (
+                    <WifiOff className="h-3 w-3 text-green-500" title="Local Development Mode" />
+                  )}
+                </div>
                 <p className="text-xs text-sidebar-foreground/60">
-                  Ask about your GPU deployments
+                  {environmentInfo.isPowerPlatform 
+                    ? "Power Platform deployment" 
+                    : "Ask about your GPU deployments"
+                  }
                 </p>
               </div>
             </div>
@@ -136,12 +149,28 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
             <div className="h-full bg-card border border-sidebar-border rounded-lg">
               {error && (
                 <div className="p-4 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
-                  <p className="text-red-800 dark:text-red-200 text-sm">
-                    {error.message.includes('API key') 
-                      ? 'OpenAI API key not configured. Please check your .env.local file.'
-                      : 'Chat error: ' + error.message
-                    }
-                  </p>
+                  <div className="text-red-800 dark:text-red-200 text-sm">
+                    <div className="font-medium mb-1">
+                      {isUsingClientSide ? 'Power Platform Chat Error' : 'Local Server Chat Error'}
+                    </div>
+                    <p>
+                      {error.message.includes('API key') 
+                        ? `OpenAI API key not configured. ${
+                            environmentInfo.isPowerPlatform 
+                              ? 'Please set VITE_OPENAI_API_KEY in your environment before building.'
+                              : 'Please check your .env.local file.'
+                          }`
+                        : error.message.includes('405') || error.message.includes('UnsupportedHttpVerb')
+                        ? 'API endpoint not available in Power Platform. Using client-side integration.'
+                        : `Chat error: ${error.message}`
+                      }
+                    </p>
+                    {isUsingClientSide && (
+                      <p className="text-xs mt-2 opacity-75">
+                        Running in Power Platform client-side mode
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
               <Chat

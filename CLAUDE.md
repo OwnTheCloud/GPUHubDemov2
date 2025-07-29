@@ -227,3 +227,35 @@ start-dev.sh             # Development startup script
 - **Server Restart**: After any changes to working-api-server.js, restart with `pkill -f "working-api-server.js" && node working-api-server.js &`
 - **Health Check**: Test server health at `http://localhost:3333/api/health`
 - **Environment**: Server loads `.env.local` for `VITE_OPENAI_API_KEY` and `VITE_OPENAI_MODEL`
+
+## Power Platform Deployment
+
+### Environment-Aware Chat System
+The application automatically detects the deployment environment and uses the appropriate chat integration:
+
+- **Local Development**: Uses Express server (`working-api-server.js`) via `/api/chat` proxy
+- **Power Platform**: Uses client-side OpenAI integration (`ClientSideOpenAI`) to bypass 405 errors
+
+### Key Files for Power Platform Support
+- `src/lib/environment.ts` - Environment detection utilities
+- `src/lib/openai-client-side.ts` - Client-side OpenAI integration for Power Platform
+- `src/hooks/use-environment-aware-chat.ts` - Hook that switches between server/client modes
+- `src/components/app-chatpanel.tsx` - Updated to use environment-aware chat
+
+### Power Platform Requirements
+1. **API Key Configuration**: Set `VITE_OPENAI_API_KEY` as environment variable before building
+2. **Build Process**: OpenAI API key must be available at build time (not runtime)
+3. **CORS Handling**: Client-side integration handles CORS automatically via direct OpenAI API calls
+4. **Error Handling**: 405 "UnsupportedHttpVerb" errors are handled gracefully with fallback to client mode
+
+### Deployment Checklist
+1. Set `VITE_OPENAI_API_KEY` environment variable
+2. Optionally set `VITE_OPENAI_MODEL` (defaults to gpt-4o-mini)
+3. Run `npm run build`
+4. Run `pac code push`
+5. Verify chat functionality shows "Power Platform Mode" indicator
+
+### Visual Indicators
+- 🔵 **Wifi icon**: Power Platform client-side mode
+- 🟢 **WifiOff icon**: Local development server mode
+- Chat header shows deployment context and mode status
