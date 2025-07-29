@@ -163,7 +163,7 @@ export function DataTable<TData, TValue>({
             editable: true,
             onSave: (value: unknown) => handleCellUpdate(rowId, fieldName, value),
             isLoading: cellIsUpdating,
-          } as any);
+          });
         } else {
           // Create a default editable cell for columns without custom cell functions
           const value = cellContext.getValue();
@@ -319,7 +319,7 @@ export function DataTable<TData, TValue>({
           </DropdownMenu>
         </div>
       </div>
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-auto max-h-[calc(100vh-16rem)]">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
