@@ -1,6 +1,42 @@
+import { useState } from "react";
 import { DataTable } from "@/components/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
+import { EditableCell } from "@/components/ui/editable-cell";
+import { useAutoSave } from "@/hooks/use-auto-save";
+
+type ExecutionSignal = {
+  id: string;
+  jobId: string;
+  action: string;
+  datacenter: string;
+  status: "Pending" | "Running" | "Completed" | "Failed" | "Cancelled";
+};
+
+const executionSignals: ExecutionSignal[] = [
+  { id: "EXE001", jobId: "GPU-DEPLOY-2024-0718-001", action: "Deploy GPU Cluster", datacenter: "Virginia Prime", status: "Completed" },
+  { id: "EXE002", jobId: "GPU-DEPLOY-2024-0718-002", action: "Scale GPU Allocation", datacenter: "Singapore Gamma", status: "Running" },
+  { id: "EXE003", jobId: "GPU-DEPLOY-2024-0718-003", action: "GPU Health Validation", datacenter: "Frankfurt Beta", status: "Failed" },
+  { id: "EXE004", jobId: "GPU-DEPLOY-2024-0718-004", action: "Firmware Update", datacenter: "Oregon Alpha", status: "Completed" },
+  { id: "EXE005", jobId: "GPU-DEPLOY-2024-0718-005", action: "Power Configuration", datacenter: "Tokyo Zeta", status: "Completed" },
+  { id: "EXE006", jobId: "GPU-DEPLOY-2024-0718-006", action: "Network Fabric Setup", datacenter: "Chicago Delta", status: "Running" },
+  { id: "EXE007", jobId: "GPU-DEPLOY-2024-0718-007", action: "Decommission GPUs", datacenter: "California Eta", status: "Cancelled" },
+  { id: "EXE008", jobId: "GPU-DEPLOY-2024-0718-008", action: "Cooling System Test", datacenter: "Ireland Epsilon", status: "Pending" },
+];
+
+const getExecutionSignalOptions = () => {
+  const options = executionSignals.map(signal => ({
+    value: signal.id,
+    label: `${signal.id} - ${signal.action} (${signal.datacenter})`,
+    variant: "outline" as const,
+  }));
+  
+  // Add "None" option for clearing the relationship
+  return [
+    { value: "", label: "Not Linked", variant: "secondary" as const },
+    ...options,
+  ];
+};
 
 type GPUDemandID = {
   id: string;
@@ -16,6 +52,7 @@ type GPUDemandID = {
   requestedDate: string;
   targetDate: string;
   status: "Pending" | "Approved" | "Fulfilled" | "Rejected" | "Provisioning";
+  signalIDLookup?: string;
 };
 
 const data: GPUDemandID[] = [
@@ -33,6 +70,7 @@ const data: GPUDemandID[] = [
     requestedDate: "2024-07-15",
     targetDate: "2024-08-01",
     status: "Approved",
+    signalIDLookup: "EXE001",
   },
   {
     id: "DEM002",
@@ -48,6 +86,7 @@ const data: GPUDemandID[] = [
     requestedDate: "2024-07-16",
     targetDate: "2024-09-01",
     status: "Pending",
+    signalIDLookup: "EXE002",
   },
   {
     id: "DEM003",
@@ -63,6 +102,7 @@ const data: GPUDemandID[] = [
     requestedDate: "2024-07-14",
     targetDate: "2024-08-15",
     status: "Fulfilled",
+    signalIDLookup: "EXE003",
   },
   {
     id: "DEM004",
@@ -78,6 +118,7 @@ const data: GPUDemandID[] = [
     requestedDate: "2024-07-17",
     targetDate: "2024-08-30",
     status: "Provisioning",
+    signalIDLookup: "EXE004",
   },
   {
     id: "DEM005",
@@ -93,6 +134,7 @@ const data: GPUDemandID[] = [
     requestedDate: "2024-07-13",
     targetDate: "2024-08-20",
     status: "Approved",
+    signalIDLookup: "EXE006",
   },
   {
     id: "DEM006",
@@ -138,10 +180,14 @@ const data: GPUDemandID[] = [
     requestedDate: "2024-07-10",
     targetDate: "2024-09-01",
     status: "Pending",
+    signalIDLookup: "EXE008",
   },
 ];
 
-const columns: ColumnDef<GPUDemandID>[] = [
+const createColumns = (
+  onSave: (rowId: string, field: string, value: unknown) => void,
+  isLoading: boolean
+): ColumnDef<GPUDemandID>[] => [
   {
     accessorKey: "id",
     header: "Demand ID",
@@ -235,6 +281,40 @@ const columns: ColumnDef<GPUDemandID>[] = [
     header: "Target Date",
   },
   {
+    accessorKey: "signalIDLookup",
+    header: "Execution Signal",
+    cell: ({ row, editable, onSave: cellOnSave, isLoading: cellIsLoading }) => {
+      const signalID = row.getValue("signalIDLookup") as string;
+      
+      if (editable && cellOnSave) {
+        return (
+          <EditableCell
+            value={signalID || ""}
+            type="select"
+            options={getExecutionSignalOptions()}
+            onSave={cellOnSave}
+            isLoading={cellIsLoading}
+          />
+        );
+      }
+      
+      if (!signalID) {
+        return <Badge variant="secondary">Not Linked</Badge>;
+      }
+      
+      const linkedSignal = executionSignals.find(signal => signal.id === signalID);
+      if (linkedSignal) {
+        return (
+          <Badge variant="outline">
+            {linkedSignal.id} - {linkedSignal.action}
+          </Badge>
+        );
+      }
+      
+      return <Badge variant="destructive">Invalid Link</Badge>;
+    },
+  },
+  {
     accessorKey: "status",
     header: "Status",
     cell: ({ row }) => {
@@ -261,12 +341,43 @@ const columns: ColumnDef<GPUDemandID>[] = [
 ];
 
 export default function DemandIDs() {
+  const [demandData, setDemandData] = useState<GPUDemandID[]>(data);
+
+  const mockSaveFunction = async (rowId: string, field: string, value: unknown) => {
+    console.log(`Saving ${field} = ${value} for row ${rowId}`);
+    
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Update local state
+    setDemandData(prevData => 
+      prevData.map(item => 
+        item.id === rowId 
+          ? { ...item, [field]: value }
+          : item
+      )
+    );
+  };
+
+  const { save, isLoading } = useAutoSave({
+    onSave: mockSaveFunction,
+    delay: 500,
+  });
+
+  const columns = createColumns(save, isLoading);
+
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">GPU Demand Requests</h2>
       </div>
-      <DataTable columns={columns} data={data} editable={true} />
+      <DataTable 
+        columns={columns} 
+        data={demandData} 
+        editable={true}
+        onCellUpdate={save}
+        isUpdating={isLoading}
+      />
     </div>
   );
 }

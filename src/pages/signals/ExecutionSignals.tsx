@@ -5,6 +5,20 @@ import { Badge } from "@/components/ui/badge";
 import { EditableCell } from "@/components/ui/editable-cell";
 import { useAutoSave } from "@/hooks/use-auto-save";
 
+// Mock demand data for cross-reference
+const demandReferences = [
+  { id: "DEM001", signalIDLookup: "EXE001", customerName: "OpenAI" },
+  { id: "DEM002", signalIDLookup: "EXE002", customerName: "Anthropic" },
+  { id: "DEM003", signalIDLookup: "EXE003", customerName: "Meta AI" },
+  { id: "DEM004", signalIDLookup: "EXE004", customerName: "Google DeepMind" },
+  { id: "DEM005", signalIDLookup: "EXE006", customerName: "Microsoft Research" },
+  { id: "DEM008", signalIDLookup: "EXE008", customerName: "Stanford AI Lab" },
+];
+
+const getLinkedDemands = (signalId: string) => {
+  return demandReferences.filter(demand => demand.signalIDLookup === signalId);
+};
+
 type ExecutionSignal = {
   id: string;
   jobId: string;
@@ -224,6 +238,37 @@ const createColumns = (
         >
           {status}
         </Badge>
+      );
+    },
+  },
+  {
+    accessorKey: "linkedDemands",
+    header: "Linked Demands",
+    cell: ({ row }) => {
+      const signalId = row.getValue("id") as string;
+      const linkedDemands = getLinkedDemands(signalId);
+      
+      if (linkedDemands.length === 0) {
+        return <Badge variant="secondary">No Links</Badge>;
+      }
+      
+      if (linkedDemands.length === 1) {
+        const demand = linkedDemands[0];
+        return (
+          <Badge variant="outline">
+            {demand.id} ({demand.customerName})
+          </Badge>
+        );
+      }
+      
+      return (
+        <div className="flex flex-wrap gap-1">
+          {linkedDemands.map(demand => (
+            <Badge key={demand.id} variant="outline" className="text-xs">
+              {demand.id}
+            </Badge>
+          ))}
+        </div>
       );
     },
   },
