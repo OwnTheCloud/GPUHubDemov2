@@ -111,8 +111,10 @@ const server = createServer(async (req, res) => {
               const data = line.slice(6);
               
               if (data === '[DONE]') {
+                // Send message annotations (required by AI SDK)
+                res.write(encoder.encode(`8:[]\n`));
                 // Send final message
-                res.write(encoder.encode(`8:{"finishReason":"stop","usage":{"promptTokens":0,"completionTokens":0}}\n`));
+                res.write(encoder.encode(`d:{"finishReason":"stop","usage":{"promptTokens":0,"completionTokens":0}}\n`));
                 console.log('✅ Stream completed');
                 res.end();
                 return;

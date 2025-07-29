@@ -6,17 +6,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Local Development
 - `npm run dev` - Start Vite development server at http://localhost:3000
-- `npm run dev:full` - Start both API server (port 3333) and Vite dev server (port 3000)
-- `npm run server` - Start Express API server only (port 3333)
+- `npm run dev:full` - Start both API server (port 3333) and Vite dev server (port 3000) using start-dev.sh
+- `npm run server` - Start Express API server only (port 3333) using working-api-server.js
 - `npm run build` - Build for production 
+- `npm run build:dev` - Build in development mode
 - `npm run lint` - Run ESLint
 - `npm run preview` - Preview production build
 
 ### OpenAI API Setup
 1. Get API key from https://platform.openai.com/api-keys
 2. Set `VITE_OPENAI_API_KEY=your_api_key` in `.env.local`
-3. Optionally set `VITE_OPENAI_MODEL=gpt-4-turbo` for different model
+3. Optionally set `VITE_OPENAI_MODEL=gpt-4o-mini` for different model (defaults to gpt-4o-mini)
 4. Run `npm run dev:full` to start both frontend and API server
+
+**Note**: The API integration bypasses Vercel AI SDK's streamText due to compatibility issues and uses direct OpenAI API calls with custom stream formatting. The server sends proper AI SDK data stream format including required `message_annotations` array (`8:[]`) to prevent parsing errors.
 
 ### Power Platform Development
 - `npm run dev:power` - Start both Vite and PAC code servers (Windows only)
@@ -34,15 +37,15 @@ pac auth create --environment {environment-id}
 ### Core Application Structure
 The app uses a multi-provider wrapper pattern in `main.tsx`:
 ```
-PowerProvider (Power Platform SDK) 
+PowerProvider (Power Platform SDK initialization with error suppression)
   → App (Contains all other providers)
-    → QueryClientProvider (React Query)
-    → ThemeProvider (Dark mode)
+    → QueryClientProvider (React Query for async state)
+    → ThemeProvider (Dark mode with next-themes, defaults to dark)
     → TooltipProvider (ShadCN tooltips)
-    → BrowserRouter/HashRouter (React Router - auto-detects Power Platform)
-    → ChatPanelProvider (AI chat functionality)
-    → SidebarProvider (ShadCN sidebar state)
-      → MainLayout (3-panel layout with sidebars and main content)
+    → BrowserRouter/HashRouter (Auto-detects Power Platform via hostname)
+    → ChatPanelProvider (AI chat panel state management)
+    → SidebarProvider (ShadCN sidebar collapsible state)
+      → MainLayout (3-panel: sidebar + main content + chat panel)
 ```
 
 ### Power Platform Integration
@@ -52,8 +55,9 @@ PowerProvider (Power Platform SDK)
 
 ### Layout Architecture  
 - **Three-Panel Layout**: Left sidebar (navigation) + Main content + Right sidebar (AI chat)
-- **Dynamic Routing**: Auto-detects Power Platform context and switches between BrowserRouter and HashRouter
-- **Responsive Design**: Chat panel positioning adjusts main content padding dynamically
+- **Dynamic Routing**: Auto-detects Power Platform context via `window.location.hostname.includes('powerapps.com')`
+- **Responsive Design**: Chat panel (fixed right, 24rem when expanded, 3rem when collapsed) adjusts main content padding
+- **Chat Panel States**: Collapsed (12px width with toggle button) and expanded (384px width with full interface)
 
 ### Navigation Architecture
 - **Dual Sidebar Modes**: Uses ShadCN sidebar with `collapsible="icon"` 
@@ -63,27 +67,33 @@ PowerProvider (Power Platform SDK)
 - **Route Structure**: 7 pages organized in domain groups (signals/, cscp/)
 
 ### AI Chat Integration
-- **OpenAI Integration**: Powered by OpenAI GPT models via Vercel AI SDK
-- **Chat Panel**: Fixed position right sidebar with collapsible functionality
-- **Context Aware**: Chat panel state affects main content area padding
-- **Provider Pattern**: Uses ChatPanelProvider for state management across components
-- **GPU-Specific Prompts**: System prompt tailored for GPU infrastructure management
-- **Error Handling**: Shows configuration errors when API key is missing
+- **Direct OpenAI Integration**: Uses custom working-api-server.js that bypasses Vercel AI SDK issues
+- **Chat Panel**: Fixed position right sidebar (app-chatpanel.tsx) with collapsible functionality
+- **Stream Processing**: Custom stream format conversion from OpenAI SSE to AI SDK data stream format
+  - Sends `0:"text"` for content chunks
+  - Sends `8:[]` for message_annotations (required empty array)
+  - Sends `d:{finishReason,usage}` for completion data
+- **Provider Pattern**: ChatPanelProvider manages isExpanded state and toggleExpanded callback
+- **GPU-Specific Context**: System prompt and suggestions tailored for GPU infrastructure management
+- **Error Handling**: Displays API key configuration errors and connection issues
+- **API Server**: Runs on port 3333 with CORS, health check endpoint, and proper error handling
 
 ### Data Layer
-- **Mock Data**: Located in `src/data/` for demonstration
-- **Data Tables**: Reusable `DataTable` component using TanStack Table with editable cells
+- **Mock Data**: Located in `src/data/` (assets.ts, owners.ts) for demonstration
+- **Data Tables**: Reusable `DataTable` component using TanStack Table v8 with editable cells
 - **State Management**: React Query for async state, React hooks for local state
-- **Auto-save**: Built-in auto-save functionality for editable tables
+- **Auto-save**: Built-in auto-save functionality via use-auto-save.tsx hook
+- **Editable Components**: Custom editable-cell.tsx, editable-input.tsx, editable-select.tsx
 - **Export/Import**: CSV export functionality with bulk operations support
 
 ### UI System
-- **Design System**: ShadCN UI components (`src/components/ui/`)
+- **Design System**: ShadCN UI components (`src/components/ui/`) built on Radix UI primitives
 - **Theming**: TailwindCSS with CSS custom properties, next-themes for dark mode (defaults to dark)
-- **Icons**: Lucide React throughout
+- **Icons**: Lucide React throughout (Home, Box, Database, Cpu, Activity, etc.)
 - **Charts**: Recharts with custom ShadCN chart components
-- **Audio/Visual**: Audio visualizer components with recording capabilities
-- **AI Components**: Custom chat interface with markdown rendering and syntax highlighting
+- **Chat Components**: Custom chat interface (chat.tsx, message-list.tsx, markdown-renderer.tsx) with syntax highlighting via Shiki
+- **Audio Components**: Audio visualizer and recording capabilities (audio-visualizer.tsx, use-audio-recording.ts)
+- **Mobile Detection**: use-mobile.tsx hook for responsive behavior
 
 ## Key Patterns
 
@@ -118,9 +128,13 @@ const columns: ColumnDef<Type>[] = [
 
 ### Sidebar Menu Configuration
 Navigation is defined in three arrays in `app-sidebar.tsx`:
-- `menuItems`: Top-level pages
-- `coiSignals`: CO+I Signals group 
-- `cscpSignals`: CSCP Signals group
+- `menuItems`: Top-level pages (Home, Universal Supply)
+- `coiSignals`: CO+I Signals group (Investigation Signals, Execution Signals)
+- `cscpSignals`: CSCP Signals group (Datacenters, Stamps, Demand IDs)
+
+**Dual Display Logic**: Uses `group-data-[state=*]` classes to show:
+- Expanded: Collapsible groups with sub-items
+- Collapsed: Individual icons with tooltips (all items flattened)
 
 ### Power Platform Specific Requirements
 
@@ -128,15 +142,25 @@ Navigation is defined in three arrays in `app-sidebar.tsx`:
 Must use port 3000 for Power Platform compatibility. Never change this in vite.config.ts.
 
 #### TypeScript Configuration
-- `strict: false` mode used for Power Platform compatibility
+- Relaxed type checking for Power Platform compatibility:
+  - `noImplicitAny: false`
+  - `strictNullChecks: false` 
+  - `noUnusedParameters: false`
+  - `noUnusedLocals: false`
 - Path aliases configured with `@/*` pointing to `./src/*`
-- Relaxed linting rules for faster development
+- `skipLibCheck: true` and `allowJs: true` for compatibility
 
 #### SDK Usage
-Power Platform SDK is initialized once in PowerProvider. For data connections:
-1. Add data source via PAC CLI: `pac code add-data-source -a <apiId> -c <connectionId>`
-2. Generated Models and Services appear in `src/Models` and `src/Services`
-3. Schema references available in `.power/schemas`
+Power Platform SDK is initialized in PowerProvider with error suppression:
+- Suppresses MutationObserver and web-client-content-script errors
+- Graceful fallback if SDK initialization fails
+- Loading state shown during initialization
+
+For data connections:
+1. `pac auth create --environment {environment-id}`
+2. `pac code add-data-source -a <apiId> -c <connectionId>`
+3. Generated Models and Services appear in `src/Models` and `src/Services`
+4. Schema references available in `.power/schemas`
 
 #### Deployment Process
 1. `npm run build`
@@ -146,41 +170,43 @@ Power Platform SDK is initialized once in PowerProvider. For data connections:
 
 ```
 src/
-├── api/
-│   └── chat.ts             # OpenAI API integration (legacy)
 ├── components/
-│   ├── ui/                 # ShadCN components (auto-generated)
-│   ├── app-sidebar.tsx     # Main navigation component  
-│   ├── app-chatpanel.tsx   # AI chat panel component
-│   ├── data-table.tsx      # Reusable table with TanStack Table
+│   ├── ui/                 # ShadCN components (50+ components)
+│   │   ├── chat.tsx        # Main chat interface
+│   │   ├── sidebar.tsx     # Collapsible sidebar component
+│   │   ├── editable-*.tsx  # Editable table cell components
+│   │   └── audio-*.tsx     # Audio visualization components
+│   ├── app-sidebar.tsx     # Main navigation with dual display modes
+│   ├── app-chatpanel.tsx   # AI chat panel with context provider
+│   ├── data-table.tsx      # Reusable table with TanStack Table v8
 │   ├── AssetCard.tsx       # Asset display component
 │   └── AssetDetail.tsx     # Asset detail view
-├── pages/
+├── pages/                  # 7 total pages
 │   ├── Home.tsx            # Dashboard with Recharts area chart
+│   ├── Index.tsx           # Legacy index page
 │   ├── UniversalSupply.tsx # Supply management page
-│   ├── signals/            # CO+I Signals domain pages
-│   │   ├── InvestigationSignals.tsx
-│   │   └── ExecutionSignals.tsx
-│   └── cscp/              # CSCP Signals domain pages
-│       ├── Datacenters.tsx
-│       ├── Stamps.tsx
-│       └── DemandIDs.tsx
+│   ├── signals/            # CO+I Signals domain (2 pages)
+│   └── cscp/              # CSCP Signals domain (3 pages)
 ├── data/                  # Mock data for demonstration
 │   ├── assets.ts          # Asset data structures
 │   └── owners.ts          # Owner/user data
 ├── hooks/                 # Custom React hooks
 │   ├── use-auto-save.tsx  # Auto-save functionality
 │   ├── use-audio-recording.ts # Audio recording
-│   └── use-mobile.tsx     # Mobile detection
+│   └── use-mobile.tsx     # Mobile detection hook
 ├── lib/                   # Utility functions
-│   ├── utils.ts           # General utilities
-│   └── audio-utils.ts     # Audio processing
+│   ├── utils.ts           # General utilities (cn, etc.)
+│   └── audio-utils.ts     # Audio processing utilities
 ├── types/                 # TypeScript type definitions
 │   └── asset.ts           # Asset type definitions
-├── App.tsx               # Provider setup and routing
+├── App.tsx               # Provider setup and routing logic
 ├── main.tsx              # Entry point with PowerProvider
-├── PowerProvider.tsx     # Power Platform SDK initialization
-└── server.js             # Express API server for OpenAI integration
+├── PowerProvider.tsx     # Power Platform SDK with error handling
+public/
+├── favicon.png          # 512x512 GPU chip favicon
+└── gpu-icon.png         # Original GPU icon for high-res displays
+working-api-server.js     # Express API server bypassing AI SDK issues
+start-dev.sh             # Development startup script
 ```
 
 ## Important Notes
@@ -193,3 +219,11 @@ src/
 - Power Platform deployment requires "first release" region environments
 - MutationObserver errors are suppressed in Power Platform context (handled in PowerProvider)
 - Router automatically switches between BrowserRouter and HashRouter based on environment
+- Favicon is a GPU chip icon from UXWing (commercial use allowed) in `public/` directory
+
+## Critical API Server Notes
+
+- **Stream Format**: The working-api-server.js sends AI SDK-compatible data stream format to prevent "message_annotations" parsing errors
+- **Server Restart**: After any changes to working-api-server.js, restart with `pkill -f "working-api-server.js" && node working-api-server.js &`
+- **Health Check**: Test server health at `http://localhost:3333/api/health`
+- **Environment**: Server loads `.env.local` for `VITE_OPENAI_API_KEY` and `VITE_OPENAI_MODEL`

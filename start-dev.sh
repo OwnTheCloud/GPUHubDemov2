@@ -6,12 +6,13 @@ echo ""
 # Kill any existing processes
 echo "🧹 Cleaning up existing processes..."
 pkill -f "simple-api-server.js" 2>/dev/null || true
+pkill -f "working-api-server.js" 2>/dev/null || true
 pkill -f "vite" 2>/dev/null || true
 sleep 1
 
 # Start API server in background
 echo "🔌 Starting API Server on port 3333..."
-node simple-api-server.js &
+node working-api-server.js &
 API_PID=$!
 
 # Wait for API server to be ready
