@@ -81,10 +81,11 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
   return (
     <div
       className={cn(
-        "h-full transition-all duration-300 ease-in-out border-l border-sidebar-border bg-sidebar text-sidebar-foreground",
+        "h-full transition-all duration-300 ease-in-out border-l border-sidebar-border bg-sidebar text-sidebar-foreground backdrop-blur-none",
         isExpanded ? "w-96" : "w-12",
         className
       )}
+      style={{ backgroundColor: 'hsl(var(--sidebar))' }}
     >
       {/* Collapsed state - just the toggle button */}
       {!isExpanded && (
