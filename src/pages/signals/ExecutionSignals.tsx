@@ -4,6 +4,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { EditableCell } from "@/components/ui/editable-cell";
 import { useAutoSave } from "@/hooks/use-auto-save";
+import { PageWrapper } from "@/components/page-wrapper";
 
 // Mock demand data for cross-reference
 const demandReferences = [
@@ -301,10 +302,7 @@ export default function ExecutionSignals() {
   const columns = createColumns(save, isLoading);
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">GPU Execution Signals</h2>
-      </div>
+    <PageWrapper title="GPU Execution Signals">
       <DataTable 
         columns={columns} 
         data={data} 
@@ -312,6 +310,6 @@ export default function ExecutionSignals() {
         onCellUpdate={save}
         isUpdating={isLoading}
       />
-    </div>
+    </PageWrapper>
   );
 }

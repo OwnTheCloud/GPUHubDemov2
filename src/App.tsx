@@ -29,9 +29,9 @@ function MainLayout() {
       <AppSidebar />
       
       {/* Dynamic Main Content Area - fills available space between sidebars */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-auto">
         <SidebarInset 
-          className="w-full h-full transition-all duration-300 ease-in-out"
+          className="w-full h-full transition-all duration-300 ease-in-out overflow-auto"
           style={{
             paddingRight: chatExpanded ? "24rem" : "3rem"
           }}

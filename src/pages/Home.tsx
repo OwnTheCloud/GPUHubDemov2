@@ -2,7 +2,19 @@ import * as React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, XAxis, ResponsiveContainer } from "recharts";
+import { KPICard } from "@/components/ui/kpi-card";
+import { Cpu, Database, Zap, Activity, TrendingUp, Calendar, Server } from "lucide-react";
+import { motion } from "framer-motion";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { PageWrapper } from "@/components/page-wrapper";
 
 const gpuDeploymentData = [
   { date: "2023-07-15", h100: 1200, a100: 800, h200: 150, gb200: 50 },
@@ -56,6 +68,8 @@ const chartConfig = {
 
 export default function Home() {
   const [timeRange, setTimeRange] = React.useState("6m");
+  const [selectedDataPoint, setSelectedDataPoint] = React.useState<typeof gpuDeploymentData[0] | null>(null);
+  const [drillDownOpen, setDrillDownOpen] = React.useState(false);
 
   const filteredData = gpuDeploymentData.filter((item) => {
     const date = new Date(item.date);
@@ -73,49 +87,95 @@ export default function Home() {
     return date >= startDate;
   });
 
+  // Generate sparkline data for KPI cards
+  const totalGPUsSparkline = gpuDeploymentData.slice(-10).map(d => d.h100 + d.a100 + d.h200 + d.gb200);
+  const datacenterSparkline = [42, 43, 44, 44, 45, 45, 46, 47, 47, 47];
+  const powerSparkline = [115.2, 117.8, 119.3, 121.5, 122.8, 124.1, 125.3, 126.2, 127.0, 127.5];
+  const utilizationSparkline = [82.5, 83.1, 84.2, 85.0, 85.8, 86.3, 86.9, 87.1, 87.3, 87.4];
+
+  const handleChartClick = (data: { activePayload?: Array<{ payload: typeof gpuDeploymentData[0] }> }) => {
+    if (data && data.activePayload) {
+      setSelectedDataPoint(data.activePayload[0].payload);
+      setDrillDownOpen(true);
+    }
+  };
+
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">GPU Deployment Dashboard</h2>
-      </div>
-      <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total GPUs Deployed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">9,580</div>
-            <p className="text-xs text-muted-foreground">+12.3% from last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Datacenters</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">47</div>
-            <p className="text-xs text-muted-foreground">+3 new this quarter</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Power Consumption</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">127.5 MW</div>
-            <p className="text-xs text-muted-foreground">+8.2% from last month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Utilization Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">87.4%</div>
-            <p className="text-xs text-muted-foreground">+2.1% from last week</p>
-          </CardContent>
-        </Card>
-      </div>
+    <PageWrapper title="GPU Deployment Dashboard">
+      <motion.div 
+        className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, staggerChildren: 0.1 }}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3 }}
+        >
+          <KPICard
+            title="Total GPUs Deployed"
+            value={9580}
+            change={12.3}
+            changeLabel="from last month"
+            sparklineData={totalGPUsSparkline}
+            icon={Cpu}
+            trend="up"
+            onClick={() => console.log("View GPU details")}
+          />
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
+          <KPICard
+            title="Active Datacenters"
+            value={47}
+            changeLabel="+3 new this quarter"
+            sparklineData={datacenterSparkline}
+            icon={Database}
+            trend="up"
+            onClick={() => console.log("View datacenter details")}
+          />
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+        >
+          <KPICard
+            title="Power Consumption"
+            value={127.5}
+            suffix=" MW"
+            decimals={1}
+            change={8.2}
+            changeLabel="from last month"
+            sparklineData={powerSparkline}
+            icon={Zap}
+            trend="up"
+            onClick={() => console.log("View power details")}
+          />
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3, delay: 0.3 }}
+        >
+          <KPICard
+            title="Utilization Rate"
+            value={87.4}
+            suffix="%"
+            decimals={1}
+            change={2.1}
+            changeLabel="from last week"
+            sparklineData={utilizationSparkline}
+            icon={Activity}
+            trend="up"
+            onClick={() => console.log("View utilization details")}
+          />
+        </motion.div>
+      </motion.div>
       <div className="flex gap-4">
         <Card className="flex-[3] min-w-0">
           <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
@@ -157,6 +217,8 @@ export default function Home() {
                   left: 12,
                   right: 12,
                 }}
+                onClick={handleChartClick}
+                style={{ cursor: "pointer" }}
               >
                 <CartesianGrid vertical={false} />
                 <XAxis
@@ -316,6 +378,107 @@ export default function Home() {
           </CardContent>
         </Card>
       </div>
-    </div>
+
+      {/* Drill-down Dialog */}
+      <Dialog open={drillDownOpen} onOpenChange={setDrillDownOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              GPU Deployment Details - {selectedDataPoint?.date && new Date(selectedDataPoint.date).toLocaleDateString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </DialogTitle>
+            <DialogDescription>
+              Detailed breakdown of GPU deployments for the selected date
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedDataPoint && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">H100</Badge>
+                  </div>
+                  <p className="text-2xl font-bold">{selectedDataPoint.h100}</p>
+                  <p className="text-xs text-muted-foreground">Units deployed</p>
+                </motion.div>
+                
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge variant="destructive">A100</Badge>
+                  </div>
+                  <p className="text-2xl font-bold">{selectedDataPoint.a100}</p>
+                  <p className="text-xs text-muted-foreground">Units deployed</p>
+                </motion.div>
+                
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.2 }}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">H200</Badge>
+                  </div>
+                  <p className="text-2xl font-bold">{selectedDataPoint.h200}</p>
+                  <p className="text-xs text-muted-foreground">Units deployed</p>
+                </motion.div>
+                
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.3 }}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge variant="default">GB200</Badge>
+                  </div>
+                  <p className="text-2xl font-bold">{selectedDataPoint.gb200}</p>
+                  <p className="text-xs text-muted-foreground">Units deployed</p>
+                </motion.div>
+              </div>
+              
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Server className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Total GPUs</span>
+                  </div>
+                  <span className="text-xl font-bold">
+                    {selectedDataPoint.h100 + selectedDataPoint.a100 + selectedDataPoint.h200 + selectedDataPoint.gb200}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="border-t pt-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Deployment Insights</span>
+                </div>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  <li>• H100 GPUs represent {Math.round((selectedDataPoint.h100 / (selectedDataPoint.h100 + selectedDataPoint.a100 + selectedDataPoint.h200 + selectedDataPoint.gb200)) * 100)}% of total deployment</li>
+                  <li>• GB200 adoption growing at {Math.round(selectedDataPoint.gb200 / 10)}% monthly rate</li>
+                  <li>• Power efficiency improved by 15% with newer GPU models</li>
+                </ul>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </PageWrapper>
   );
 }
