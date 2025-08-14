@@ -12,6 +12,15 @@ interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   createdAt?: Date;
+  toolInvocations?: ToolInvocation[];
+}
+
+interface ToolInvocation {
+  toolCallId: string;
+  toolName: string;
+  args: any;
+  result?: any;
+  state: 'call' | 'result';
 }
 
 interface UseEnvironmentAwareChatOptions {
@@ -35,10 +44,15 @@ export const useEnvironmentAwareChat = (options: UseEnvironmentAwareChatOptions 
   const [clientIsLoading, setClientIsLoading] = useState(false);
   const [clientError, setClientError] = useState<Error | null>(null);
 
-  // Server-side chat (for local development)
+  // Server-side chat (for local development) with tool support
   const serverChat = useChat({
     api: '/api/chat',
     initialMessages,
+    onToolCall: async ({ toolCall }) => {
+      console.log('🔧 Tool call received:', toolCall);
+      // The server handles tool execution, so we just return a placeholder
+      return 'Tool execution in progress...';
+    },
     onError: (error) => {
       console.error('Server chat error:', error);
       // If server fails, fallback to client-side
@@ -50,6 +64,9 @@ export const useEnvironmentAwareChat = (options: UseEnvironmentAwareChatOptions 
         }
       }
       onError?.(error);
+    },
+    onFinish: (message) => {
+      console.log('✅ Chat message finished:', message);
     },
   });
 
@@ -138,7 +155,11 @@ export const useEnvironmentAwareChat = (options: UseEnvironmentAwareChatOptions 
         setTimeout(() => handleClientSubmit(), 0);
       }
     } else {
-      return serverChat.append(message);
+      // Use server-side chat with tool support
+      return serverChat.append({
+        role: message.role,
+        content: message.content,
+      });
     }
   }, [isUsingClientSide, handleClientSubmit, serverChat]);
 
@@ -157,9 +178,18 @@ export const useEnvironmentAwareChat = (options: UseEnvironmentAwareChatOptions 
     };
   } else {
     return {
-      ...serverChat,
-      isUsingClientSide: false,
+      messages: serverChat.messages,
+      input: serverChat.input,
+      handleInputChange: serverChat.handleInputChange,
+      handleSubmit: serverChat.handleSubmit,
+      isLoading: serverChat.isLoading,
+      error: serverChat.error,
+      stop: serverChat.stop,
       append,
+      isUsingClientSide: false,
+      // Expose additional server-side features
+      reload: serverChat.reload,
+      setMessages: serverChat.setMessages,
     };
   }
 };

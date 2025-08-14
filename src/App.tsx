@@ -8,6 +8,7 @@ import { ThemeProvider } from "next-themes";
 import AppSidebar from "@/components/app-sidebar";
 import { ChatPanelProvider, useChatPanel } from "@/components/app-chatpanel";
 import AppChatPanel from "@/components/app-chatpanel";
+import { DataProvider } from "@/contexts/data-context";
 import { useSidebar } from "@/components/ui/sidebar";
 import Home from "@/pages/Home";
 import UniversalSupply from "@/pages/UniversalSupply";
@@ -70,11 +71,13 @@ const App = () => {
           <Toaster />
           <Sonner />
           <Router>
-            <ChatPanelProvider>
-              <SidebarProvider>
-                <MainLayout />
-              </SidebarProvider>
-            </ChatPanelProvider>
+            <DataProvider>
+              <ChatPanelProvider>
+                <SidebarProvider>
+                  <MainLayout />
+                </SidebarProvider>
+              </ChatPanelProvider>
+            </DataProvider>
           </Router>
         </TooltipProvider>
       </ThemeProvider>
