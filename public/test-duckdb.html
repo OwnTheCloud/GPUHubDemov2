@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DuckDB Browser Test</title>
+</head>
+<body>
+    <h1>DuckDB Browser Test</h1>
+    <div id="status">Testing browser capabilities...</div>
+    <div id="results"></div>
+    
+    <script type="module">
+        const statusEl = document.getElementById('status');
+        const resultsEl = document.getElementById('results');
+        
+        // Check browser capabilities
+        const capabilities = {
+            'SharedArrayBuffer': typeof SharedArrayBuffer !== 'undefined',
+            'Worker': typeof Worker !== 'undefined',
+            'WebAssembly': typeof WebAssembly !== 'undefined',
+            'CrossOriginIsolated': window.crossOriginIsolated || false
+        };
+        
+        let html = '<h2>Browser Capabilities:</h2><ul>';
+        for (const [key, value] of Object.entries(capabilities)) {
+            html += `<li>${key}: <strong style="color: ${value ? 'green' : 'red'}">${value}</strong></li>`;
+        }
+        html += '</ul>';
+        
+        if (!capabilities.CrossOriginIsolated) {
+            html += '<p style="color: orange"><strong>Warning:</strong> CrossOriginIsolated is false. This may cause issues with SharedArrayBuffer and DuckDB WASM.</p>';
+            html += '<p>The server needs to send proper COOP/COEP headers for full functionality.</p>';
+        }
+        
+        // Try to initialize DuckDB
+        html += '<h2>DuckDB Initialization Test:</h2>';
+        
+        try {
+            const duckdbModule = await import('@duckdb/duckdb-wasm');
+            
+            statusEl.textContent = 'Testing DuckDB initialization...';
+            
+            const MANUAL_BUNDLES = {
+                mvp: {
+                    mainModule: '/node_modules/@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm',
+                    mainWorker: '/node_modules/@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js',
+                },
+                eh: {
+                    mainModule: '/node_modules/@duckdb/duckdb-wasm/dist/duckdb-eh.wasm',
+                    mainWorker: '/node_modules/@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js',
+                },
+            };
+            
+            const bundle = await duckdbModule.selectBundle(MANUAL_BUNDLES);
+            html += `<p>Selected bundle: <strong>${bundle.mainWorker}</strong></p>`;
+            
+            const worker = new Worker(bundle.mainWorker);
+            const logger = new duckdbModule.ConsoleLogger();
+            const db = new duckdbModule.AsyncDuckDB(logger, worker);
+            
+            await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+            html += '<p style="color: green">✓ DuckDB instantiated successfully!</p>';
+            
+            await db.open({
+                path: ':memory:',
+                query: {}
+            });
+            html += '<p style="color: green">✓ Database opened successfully!</p>';
+            
+            const conn = await db.connect();
+            html += '<p style="color: green">✓ Connection established!</p>';
+            
+            // Try a simple query
+            const result = await conn.query('SELECT 1 as test');
+            const data = result.toArray();
+            html += `<p style="color: green">✓ Test query successful! Result: ${JSON.stringify(data[0].toJSON())}</p>`;
+            
+            await conn.close();
+            await db.terminate();
+            
+            statusEl.textContent = 'DuckDB test completed successfully!';
+            statusEl.style.color = 'green';
+            
+        } catch (error) {
+            html += `<p style="color: red">✗ Error: ${error.message}</p>`;
+            html += `<pre style="color: red">${error.stack}</pre>`;
+            statusEl.textContent = 'DuckDB initialization failed!';
+            statusEl.style.color = 'red';
+        }
+        
+        resultsEl.innerHTML = html;
+    </script>
+</body>
+</html>

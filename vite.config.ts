@@ -13,6 +13,13 @@ export default defineConfig({
         target: 'http://localhost:3333',
         changeOrigin: true,
       }
+    },
+    headers: {
+      "Cross-Origin-Embedder-Policy": "credentialless",
+      "Cross-Origin-Opener-Policy": "same-origin",
+    },
+    fs: {
+      allow: ['..']
     }
   },
   plugins: [react()],    
@@ -20,5 +27,8 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  optimizeDeps: {
+    exclude: ["@duckdb/duckdb-wasm"],
   },
 });

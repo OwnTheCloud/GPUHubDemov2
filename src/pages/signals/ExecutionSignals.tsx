@@ -1,141 +1,30 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { DataTable } from "@/components/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { EditableCell } from "@/components/ui/editable-cell";
 import { useAutoSave } from "@/hooks/use-auto-save";
-import { PageWrapper } from "@/components/page-wrapper";
-
-// Mock demand data for cross-reference
-const demandReferences = [
-  { id: "DEM001", signalIDLookup: "EXE001", customerName: "OpenAI" },
-  { id: "DEM002", signalIDLookup: "EXE002", customerName: "Anthropic" },
-  { id: "DEM003", signalIDLookup: "EXE003", customerName: "Meta AI" },
-  { id: "DEM004", signalIDLookup: "EXE004", customerName: "Google DeepMind" },
-  { id: "DEM005", signalIDLookup: "EXE006", customerName: "Microsoft Research" },
-  { id: "DEM008", signalIDLookup: "EXE008", customerName: "Stanford AI Lab" },
-];
-
-const getLinkedDemands = (signalId: string) => {
-  return demandReferences.filter(demand => demand.signalIDLookup === signalId);
-};
+import { useExecutionSignals, useUpdateExecutionSignal } from "@/hooks/use-duckdb";
+import { Loader2 } from "lucide-react";
 
 type ExecutionSignal = {
-  id: string;
-  jobId: string;
-  timestamp: string;
-  action: string;
-  datacenter: string;
-  gpuType: "A100" | "H100" | "H200" | "GB200";
-  gpuCount: number;
-  duration: string;
-  status: "Pending" | "Running" | "Completed" | "Failed" | "Cancelled";
+  mdmid: string;
+  status: "active" | "inactive" | "pending" | "failure";
+  triggered_at: string;
+  signal_type?: string;
+  threshold_value?: number;
+  current_value?: number;
+  description?: string;
+  customer?: string;
+  requested_gpus?: number;
+  demand_priority?: string;
 };
 
-const initialData: ExecutionSignal[] = [
-  {
-    id: "EXE001",
-    jobId: "GPU-DEPLOY-2024-0718-001",
-    timestamp: "2024-07-18 15:20:00",
-    action: "Deploy GPU Cluster",
-    datacenter: "Virginia Prime",
-    gpuType: "H100",
-    gpuCount: 128,
-    duration: "18m 32s",
-    status: "Completed",
-  },
-  {
-    id: "EXE002",
-    jobId: "GPU-DEPLOY-2024-0718-002",
-    timestamp: "2024-07-18 15:15:00",
-    action: "Scale GPU Allocation",
-    datacenter: "Singapore Gamma",
-    gpuType: "GB200",
-    gpuCount: 64,
-    duration: "12m 45s",
-    status: "Running",
-  },
-  {
-    id: "EXE003",
-    jobId: "GPU-DEPLOY-2024-0718-003",
-    timestamp: "2024-07-18 15:10:00",
-    action: "GPU Health Validation",
-    datacenter: "Frankfurt Beta",
-    gpuType: "H200",
-    gpuCount: 256,
-    duration: "2m 15s",
-    status: "Failed",
-  },
-  {
-    id: "EXE004",
-    jobId: "GPU-DEPLOY-2024-0718-004",
-    timestamp: "2024-07-18 14:55:00",
-    action: "Firmware Update",
-    datacenter: "Oregon Alpha",
-    gpuType: "A100",
-    gpuCount: 96,
-    duration: "45m 20s",
-    status: "Completed",
-  },
-  {
-    id: "EXE005",
-    jobId: "GPU-DEPLOY-2024-0718-005",
-    timestamp: "2024-07-18 14:30:00",
-    action: "Power Configuration",
-    datacenter: "Tokyo Zeta",
-    gpuType: "H200",
-    gpuCount: 32,
-    duration: "8m 10s",
-    status: "Completed",
-  },
-  {
-    id: "EXE006",
-    jobId: "GPU-DEPLOY-2024-0718-006",
-    timestamp: "2024-07-18 14:15:00",
-    action: "Network Fabric Setup",
-    datacenter: "Chicago Delta",
-    gpuType: "H100",
-    gpuCount: 192,
-    duration: "25m 30s",
-    status: "Running",
-  },
-  {
-    id: "EXE007",
-    jobId: "GPU-DEPLOY-2024-0718-007",
-    timestamp: "2024-07-18 14:00:00",
-    action: "Decommission GPUs",
-    datacenter: "California Eta",
-    gpuType: "A100",
-    gpuCount: 48,
-    duration: "15m 45s",
-    status: "Cancelled",
-  },
-  {
-    id: "EXE008",
-    jobId: "GPU-DEPLOY-2024-0718-008",
-    timestamp: "2024-07-18 13:45:00",
-    action: "Cooling System Test",
-    datacenter: "Ireland Epsilon",
-    gpuType: "GB200",
-    gpuCount: 16,
-    duration: "6m 22s",
-    status: "Pending",
-  },
-];
-
-const gpuTypeOptions = [
-  { value: "A100", label: "A100", variant: "destructive" as const },
-  { value: "H100", label: "H100", variant: "outline" as const },
-  { value: "H200", label: "H200", variant: "secondary" as const },
-  { value: "GB200", label: "GB200", variant: "default" as const },
-];
-
 const statusOptions = [
-  { value: "Pending", label: "Pending", variant: "secondary" as const },
-  { value: "Running", label: "Running", variant: "outline" as const },
-  { value: "Completed", label: "Completed", variant: "default" as const },
-  { value: "Failed", label: "Failed", variant: "destructive" as const },
-  { value: "Cancelled", label: "Cancelled", variant: "destructive" as const },
+  { value: "active", label: "Active", variant: "default" as const },
+  { value: "inactive", label: "Inactive", variant: "secondary" as const },
+  { value: "pending", label: "Pending", variant: "outline" as const },
+  { value: "failure", label: "Failure", variant: "destructive" as const },
 ];
 
 const createColumns = (
@@ -143,67 +32,39 @@ const createColumns = (
   isLoading: boolean
 ): ColumnDef<ExecutionSignal>[] => [
   {
-    accessorKey: "id",
-    header: "Signal ID",
+    accessorKey: "mdmid",
+    header: "MDM ID",
+    cell: ({ row }) => {
+      const id = row.getValue("mdmid") as string;
+      return <span className="font-mono">{id}</span>;
+    },
   },
   {
-    accessorKey: "jobId",
-    header: "Job ID",
-  },
-  {
-    accessorKey: "timestamp",
-    header: "Timestamp",
-  },
-  {
-    accessorKey: "action",
-    header: "Action",
-  },
-  {
-    accessorKey: "datacenter",
-    header: "Datacenter",
-  },
-  {
-    accessorKey: "gpuType",
-    header: "GPU Type",
+    accessorKey: "signal_type",
+    header: "Signal Type",
     cell: ({ row, editable, onSave: cellOnSave, isLoading: cellIsLoading }) => {
-      const gpuType = row.getValue("gpuType") as string;
+      const type = row.getValue("signal_type") as string;
       
       if (editable && cellOnSave) {
         return (
           <EditableCell
-            value={gpuType}
-            type="select"
-            options={gpuTypeOptions}
+            value={type || ""}
+            type="text"
             onSave={cellOnSave}
             isLoading={cellIsLoading}
+            placeholder="Enter signal type..."
           />
         );
       }
       
-      return (
-        <Badge
-          variant={
-            gpuType === "GB200"
-              ? "default"
-              : gpuType === "H200"
-              ? "secondary"
-              : gpuType === "H100"
-              ? "outline"
-              : "destructive"
-          }
-        >
-          {gpuType}
-        </Badge>
-      );
+      if (!type) return <span className="text-muted-foreground">-</span>;
+      
+      const displayType = type.replace(/_/g, ' ').split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      
+      return <span className="font-medium">{displayType}</span>;
     },
-  },
-  {
-    accessorKey: "gpuCount",
-    header: "GPU Count",
-  },
-  {
-    accessorKey: "duration",
-    header: "Duration",
   },
   {
     accessorKey: "status",
@@ -226,83 +87,206 @@ const createColumns = (
       return (
         <Badge
           variant={
-            status === "Completed"
+            status === "active"
               ? "default"
-              : status === "Running"
+              : status === "failure"
+              ? "destructive"
+              : status === "pending"
               ? "outline"
-              : status === "Failed"
-              ? "destructive"
-              : status === "Cancelled"
-              ? "destructive"
               : "secondary"
           }
         >
-          {status}
+          {status.charAt(0).toUpperCase() + status.slice(1)}
         </Badge>
       );
     },
   },
   {
-    accessorKey: "linkedDemands",
-    header: "Linked Demands",
+    accessorKey: "triggered_at",
+    header: "Triggered At",
     cell: ({ row }) => {
-      const signalId = row.getValue("id") as string;
-      const linkedDemands = getLinkedDemands(signalId);
+      const timestamp = row.getValue("triggered_at") as string;
+      if (!timestamp) return <span>-</span>;
       
-      if (linkedDemands.length === 0) {
-        return <Badge variant="secondary">No Links</Badge>;
+      const date = new Date(timestamp);
+      return <span className="font-mono text-sm">{date.toLocaleString()}</span>;
+    },
+  },
+  {
+    accessorKey: "threshold_value",
+    header: "Threshold",
+    cell: ({ row, editable, onSave: cellOnSave, isLoading: cellIsLoading }) => {
+      const value = row.getValue("threshold_value") as number;
+      
+      if (editable && cellOnSave) {
+        return (
+          <EditableCell
+            value={value || 0}
+            type="number"
+            onSave={cellOnSave}
+            isLoading={cellIsLoading}
+            placeholder="0"
+            validation={(val) => {
+              const num = typeof val === 'string' ? parseFloat(val) : val;
+              if (isNaN(num) || num < 0) return "Must be a positive number";
+              return null;
+            }}
+          />
+        );
       }
       
-      if (linkedDemands.length === 1) {
-        const demand = linkedDemands[0];
+      if (value === undefined || value === null) return <span className="text-muted-foreground">-</span>;
+      
+      return <span className="font-mono">{value}</span>;
+    },
+  },
+  {
+    accessorKey: "current_value",
+    header: "Current Value",
+    cell: ({ row, editable, onSave: cellOnSave, isLoading: cellIsLoading }) => {
+      const value = row.getValue("current_value") as number;
+      
+      if (editable && cellOnSave) {
         return (
-          <Badge variant="outline">
-            {demand.id} ({demand.customerName})
-          </Badge>
+          <EditableCell
+            value={value || 0}
+            type="number"
+            onSave={cellOnSave}
+            isLoading={cellIsLoading}
+            placeholder="0"
+            validation={(val) => {
+              const num = typeof val === 'string' ? parseFloat(val) : val;
+              if (isNaN(num) || num < 0) return "Must be a positive number";
+              return null;
+            }}
+          />
+        );
+      }
+      
+      if (value === undefined || value === null) return <span className="text-muted-foreground">-</span>;
+      
+      const threshold = row.getValue("threshold_value") as number;
+      const isOverThreshold = threshold && value > threshold;
+      
+      return (
+        <span className={`font-mono ${isOverThreshold ? 'text-destructive' : ''}`}>
+          {value}
+        </span>
+      );
+    },
+  },
+  {
+    accessorKey: "customer",
+    header: "Related Customer",
+    cell: ({ row }) => {
+      const customer = row.getValue("customer") as string;
+      
+      if (!customer) return <span className="text-muted-foreground">-</span>;
+      
+      return <span>{customer}</span>;
+    },
+  },
+  {
+    accessorKey: "requested_gpus",
+    header: "Requested GPUs",
+    cell: ({ row }) => {
+      const gpus = row.getValue("requested_gpus") as number;
+      
+      if (!gpus) return <span className="text-muted-foreground">-</span>;
+      
+      return <span className="font-mono">{gpus}</span>;
+    },
+  },
+  {
+    accessorKey: "description",
+    header: "Description",
+    cell: ({ row, editable, onSave: cellOnSave, isLoading: cellIsLoading }) => {
+      const description = row.getValue("description") as string;
+      
+      if (editable && cellOnSave) {
+        return (
+          <EditableCell
+            value={description || ""}
+            type="text"
+            onSave={cellOnSave}
+            isLoading={cellIsLoading}
+            placeholder="Enter description..."
+          />
         );
       }
       
       return (
-        <div className="flex flex-wrap gap-1">
-          {linkedDemands.map(demand => (
-            <Badge key={demand.id} variant="outline" className="text-xs">
-              {demand.id}
-            </Badge>
-          ))}
-        </div>
+        <span className="max-w-[400px] truncate" title={description}>
+          {description || <span className="text-muted-foreground">No description</span>}
+        </span>
       );
     },
   },
 ];
 
 export default function ExecutionSignals() {
-  const [data, setData] = useState<ExecutionSignal[]>(initialData);
+  // Fetch data from DuckDB
+  const { data: signals, loading, error, refetch } = useExecutionSignals();
+  const { mutate: updateSignal } = useUpdateExecutionSignal();
 
-  const mockSaveFunction = async (rowId: string, field: string, value: unknown) => {
-    console.log(`Saving ${field} = ${value} for row ${rowId}`);
+  // Transform data for display
+  const data = useMemo(() => {
+    if (!signals) return [];
+    return signals as ExecutionSignal[];
+  }, [signals]);
+
+  // Save function that updates DuckDB
+  const handleSave = async (rowId: string, field: string, value: unknown) => {
+    console.log(`Saving ${field} = ${value} for signal ${rowId}`);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Update local state
-    setData(prevData => 
-      prevData.map(item => 
-        item.id === rowId 
-          ? { ...item, [field]: value }
-          : item
-      )
+    await updateSignal(
+      { 
+        mdmid: rowId, 
+        updates: { [field]: value } 
+      },
+      {
+        onSuccess: () => {
+          refetch(); // Refresh data after successful update
+        },
+        successMessage: "Execution signal updated successfully",
+        errorMessage: "Failed to update execution signal"
+      }
     );
   };
 
   const { save, isLoading } = useAutoSave({
-    onSave: mockSaveFunction,
+    onSave: handleSave,
     delay: 500,
   });
 
   const columns = createColumns(save, isLoading);
 
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading execution signals...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 p-4 md:p-8 pt-6">
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">Failed to load execution signals: {error}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <PageWrapper title="GPU Execution Signals">
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <div className="flex items-center justify-between space-y-2">
+        <h2 className="text-3xl font-bold tracking-tight">GPU Execution Signals</h2>
+      </div>
       <DataTable 
         columns={columns} 
         data={data} 
@@ -310,6 +294,6 @@ export default function ExecutionSignals() {
         onCellUpdate={save}
         isUpdating={isLoading}
       />
-    </PageWrapper>
+    </div>
   );
 }

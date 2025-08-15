@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, HashRouter } from "react-router-dom";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { ThemeProvider } from "next-themes";
+import { DuckDBProvider } from "@/components/DuckDBProvider";
 import AppSidebar from "@/components/app-sidebar";
 import { ChatPanelProvider, useChatPanel } from "@/components/app-chatpanel";
 import AppChatPanel from "@/components/app-chatpanel";
@@ -67,19 +68,21 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <Router>
-            <DataProvider>
-              <ChatPanelProvider>
-                <SidebarProvider>
-                  <MainLayout />
-                </SidebarProvider>
-              </ChatPanelProvider>
-            </DataProvider>
-          </Router>
-        </TooltipProvider>
+        <DuckDBProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <Router>
+              <DataProvider>
+                <ChatPanelProvider>
+                  <SidebarProvider>
+                    <MainLayout />
+                  </SidebarProvider>
+                </ChatPanelProvider>
+              </DataProvider>
+            </Router>
+          </TooltipProvider>
+        </DuckDBProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
