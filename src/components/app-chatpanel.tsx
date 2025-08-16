@@ -1,4 +1,4 @@
-import { useState, useCallback, createContext, useContext } from "react";
+import { useState, useCallback, createContext, useContext, useMemo } from "react";
 import { MessageCircle, X, Cpu, Wifi, WifiOff, Database, Zap, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Chat } from "@/components/ui/chat";
@@ -26,8 +26,8 @@ export function ChatPanelProvider({ children }: { children: React.ReactNode }) {
   const [isExpanded, setIsExpanded] = useState(false); // Default to collapsed
   
   const toggleExpanded = useCallback(() => {
-    setIsExpanded(!isExpanded);
-  }, [isExpanded]);
+    setIsExpanded(prev => !prev);
+  }, []);
 
   return (
     <ChatPanelContext.Provider value={{ isExpanded, toggleExpanded }}>
@@ -44,6 +44,16 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
   const { isExpanded, toggleExpanded } = useChatPanel();
   const environmentInfo = getEnvironmentInfo();
   
+  // Memoize initial messages to prevent recreation on every render
+  const initialMessages = useMemo(() => [
+    {
+      id: "welcome",
+      role: "assistant" as const,
+      content: "Hello! I'm your GPU Assistant. I can help you analyze your GPU deployments, power consumption, and performance metrics. Ask me about your datacenters, GPU utilization, or any signals you're seeing.",
+      createdAt: new Date(),
+    },
+  ], []);
+  
   // Initialize environment-aware chat functionality
   const {
     messages,
@@ -59,14 +69,7 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
     onError: (error) => {
       console.error("Chat error:", error);
     },
-    initialMessages: [
-      {
-        id: "welcome",
-        role: "assistant",
-        content: "Hello! I'm your GPU Assistant. I can help you analyze your GPU deployments, power consumption, and performance metrics. Ask me about your datacenters, GPU utilization, or any signals you're seeing.",
-        createdAt: new Date(),
-      },
-    ],
+    initialMessages,
   });
 
   // GPU-related prompt suggestions

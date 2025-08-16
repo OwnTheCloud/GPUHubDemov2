@@ -2,12 +2,13 @@ import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import dotenv from 'dotenv';
+import { executeServerTool } from './server-db-service.js';
 
 // ES Module compatibility
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Import DataService (we'll create a simple version for Node.js)
+// Legacy DataService for backward compatibility
 const DataService = {
   datacentersData: [
     {
@@ -276,70 +277,78 @@ const tools = [
       parameters: {
         type: "object",
         properties: {
-          utilizationThreshold: { type: "number", default: 50, description: "Utilization threshold percentage" }
+          utilizationThreshold: { type: "number", default: 70, description: "Utilization threshold percentage" }
         }
       }
     }
   }
 ];
 
-// Tool execution functions
+// Tool execution functions - now uses the new database service
 const executeTool = async (toolName, args) => {
-  console.log(`🔧 Executing tool: ${toolName} with args:`, args);
-  
-  switch (toolName) {
-    case 'queryDatacenters':
-      const results = DataService.queryDatacenters(args.filters || {});
-      return {
-        success: true,
-        data: results,
-        summary: `Found ${results.length} datacenters matching criteria`
-      };
-      
-    case 'getDatacenterWithMostGPUs':
-      const stats = DataService.getDatacenterStats();
-      const topDC = stats.datacentersByGPUs[0];
-      return {
-        datacenter: topDC.name,
-        gpuCount: topDC.deployedGPUs,
-        region: topDC.region,
-        utilization: topDC.utilization,
-        powerUsage: topDC.powerUsage,
-        type: topDC.type
-      };
-      
-    case 'getTotalPowerConsumption':
-      const powerStats = DataService.getDatacenterStats();
-      const response = {
-        totalPower: powerStats.totalPowerUsage,
-        unit: 'MW',
-        datacenters: powerStats.totalDatacenters,
-        onlineDatacenters: powerStats.onlineDatacenters
-      };
-      
-      if (args.includeBreakdown) {
-        response.breakdown = powerStats.powerByDatacenter;
-      }
-      
-      return response;
-      
-    case 'findUnderutilizedGPUs':
-      const underutilized = DataService.findUnderutilizedResources(args.utilizationThreshold || 50);
-      return {
-        datacenters: underutilized.datacenters.map(dc => ({
-          name: dc.name,
-          region: dc.region,
-          utilization: dc.utilization,
-          deployedGPUs: dc.deployedGPUs,
-          capacity: dc.gpuCapacity
-        })),
-        totalUnderutilizedGPUs: underutilized.totalUnderutilizedGPUs,
-        totalAvailableCapacity: underutilized.totalWastedCapacity,
-        recommendations: underutilized.recommendations
-      };
-      
-    default:
-      throw new Error(`Unknown tool: ${toolName}`);
+  try {
+    // Use the new server database service for better data
+    return await executeServerTool(toolName, args);
+  } catch (error) {
+    console.error(`❌ Failed to execute tool with new service, falling back to legacy:`, error);
+    
+    // Fallback to legacy DataService for backward compatibility
+    console.log(`🔧 Executing legacy tool: ${toolName} with args:`, args);
+    
+    switch (toolName) {
+      case 'queryDatacenters':
+        const results = DataService.queryDatacenters(args.filters || {});
+        return {
+          success: true,
+          data: results,
+          summary: `Found ${results.length} datacenters matching criteria`
+        };
+        
+      case 'getDatacenterWithMostGPUs':
+        const stats = DataService.getDatacenterStats();
+        const topDC = stats.datacentersByGPUs[0];
+        return {
+          datacenter: topDC.name,
+          gpuCount: topDC.deployedGPUs,
+          region: topDC.region,
+          utilization: topDC.utilization,
+          powerUsage: topDC.powerUsage,
+          type: topDC.type
+        };
+        
+      case 'getTotalPowerConsumption':
+        const powerStats = DataService.getDatacenterStats();
+        const response = {
+          totalPower: powerStats.totalPowerUsage,
+          unit: 'MW',
+          datacenters: powerStats.totalDatacenters,
+          onlineDatacenters: powerStats.onlineDatacenters
+        };
+        
+        if (args.includeBreakdown) {
+          response.breakdown = powerStats.powerByDatacenter;
+        }
+        
+        return response;
+        
+      case 'findUnderutilizedGPUs':
+        const underutilized = DataService.findUnderutilizedResources(args.utilizationThreshold || 50);
+        return {
+          datacenters: underutilized.datacenters.map(dc => ({
+            name: dc.name,
+            region: dc.region,
+            utilization: dc.utilization,
+            deployedGPUs: dc.deployedGPUs,
+            capacity: dc.gpuCapacity
+          })),
+          totalUnderutilizedGPUs: underutilized.totalUnderutilizedGPUs,
+          totalAvailableCapacity: underutilized.totalWastedCapacity,
+          recommendations: underutilized.recommendations
+        };
+        
+      default:
+        throw new Error(`Unknown tool: ${toolName}`);
+    }
   }
 };
 
@@ -472,9 +481,12 @@ const server = createServer(async (req, res) => {
               const data = line.slice(6);
               
               if (data === '[DONE]') {
-                // Execute any pending tool calls
+                // Execute any pending tool calls and then make a follow-up call to OpenAI
                 if (toolCalls.length > 0) {
                   console.log(`🔧 Executing ${toolCalls.length} tool calls`);
+                  
+                  // Execute all tools and collect results
+                  const toolMessages = [];
                   
                   for (const toolCall of toolCalls) {
                     try {
@@ -490,6 +502,13 @@ const server = createServer(async (req, res) => {
                       res.write(encoder.encode(toolCallData));
                       console.log('🔧 Tool result sent for:', toolCall.function.name);
                       
+                      // Prepare tool result message for follow-up call
+                      toolMessages.push({
+                        role: 'tool',
+                        content: JSON.stringify(toolResult),
+                        tool_call_id: toolCall.id
+                      });
+                      
                     } catch (toolError) {
                       console.error('❌ Tool execution error:', toolError);
                       const errorData = `9:${JSON.stringify({
@@ -498,12 +517,93 @@ const server = createServer(async (req, res) => {
                         error: toolError.message
                       })}\n`;
                       res.write(encoder.encode(errorData));
+                      
+                      // Add error as tool result
+                      toolMessages.push({
+                        role: 'tool',
+                        content: `Error: ${toolError.message}`,
+                        tool_call_id: toolCall.id
+                      });
                     }
                   }
                   
-                  // After tools, send a completion message
-                  const completionText = 'Based on the data above, let me provide you with the analysis.';
-                  res.write(encoder.encode(`0:${JSON.stringify(completionText)}\n`));
+                  // Now make a follow-up call to OpenAI with the tool results
+                  console.log('🤖 Making follow-up call to OpenAI with tool results...');
+                  
+                  const followUpMessages = [
+                    ...messagesWithSystem,
+                    {
+                      role: 'assistant',
+                      content: '',
+                      tool_calls: toolCalls.map(tc => ({
+                        id: tc.id,
+                        type: 'function',
+                        function: {
+                          name: tc.function.name,
+                          arguments: tc.function.arguments
+                        }
+                      }))
+                    },
+                    ...toolMessages
+                  ];
+                  
+                  // Make follow-up call to get AI's analysis of the tool results
+                  const followUpResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${apiKey}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      model: process.env.VITE_OPENAI_MODEL || 'gpt-4o-mini',
+                      messages: followUpMessages,
+                      temperature: 0.7,
+                      max_tokens: 1500,
+                      stream: true
+                    })
+                  });
+                  
+                  if (followUpResponse.ok) {
+                    // Stream the follow-up response
+                    const followUpReader = followUpResponse.body.getReader();
+                    let followUpBuffer = '';
+                    
+                    while (true) {
+                      const { done, value } = await followUpReader.read();
+                      if (done) break;
+
+                      followUpBuffer += decoder.decode(value, { stream: true });
+                      const lines = followUpBuffer.split('\n');
+                      followUpBuffer = lines.pop() || '';
+
+                      for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                          const data = line.slice(6);
+                          
+                          if (data === '[DONE]') {
+                            break;
+                          }
+
+                          try {
+                            const json = JSON.parse(data);
+                            const delta = json.choices?.[0]?.delta;
+                            
+                            if (delta?.content) {
+                              const textChunk = `0:${JSON.stringify(delta.content)}\n`;
+                              res.write(encoder.encode(textChunk));
+                            }
+                          } catch (parseError) {
+                            // Skip non-JSON lines
+                            continue;
+                          }
+                        }
+                      }
+                    }
+                  } else {
+                    console.error('❌ Follow-up API call failed');
+                    const analysisText = '\n\nBased on the tool results above, I\'ve found the GPU resource information you requested.';
+                    res.write(encoder.encode(`0:${JSON.stringify(analysisText)}\n`));
+                  }
                 }
                 
                 // Send message annotations (required by AI SDK)

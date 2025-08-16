@@ -18,8 +18,8 @@ interface Message {
 interface ToolInvocation {
   toolCallId: string;
   toolName: string;
-  args: any;
-  result?: any;
+  args: Record<string, unknown>;
+  result?: Record<string, unknown>;
   state: 'call' | 'result';
 }
 
@@ -48,11 +48,8 @@ export const useEnvironmentAwareChat = (options: UseEnvironmentAwareChatOptions 
   const serverChat = useChat({
     api: '/api/chat',
     initialMessages,
-    onToolCall: async ({ toolCall }) => {
-      console.log('🔧 Tool call received:', toolCall);
-      // The server handles tool execution, so we just return a placeholder
-      return 'Tool execution in progress...';
-    },
+    // Remove onToolCall - let the server handle tool execution completely
+    // The server streams tool results in AI SDK format (9:...) which the useChat hook will process automatically
     onError: (error) => {
       console.error('Server chat error:', error);
       // If server fails, fallback to client-side
@@ -67,6 +64,7 @@ export const useEnvironmentAwareChat = (options: UseEnvironmentAwareChatOptions 
     },
     onFinish: (message) => {
       console.log('✅ Chat message finished:', message);
+      console.log('📊 Message tool invocations:', message.toolInvocations);
     },
   });
 
@@ -111,7 +109,72 @@ export const useEnvironmentAwareChat = (options: UseEnvironmentAwareChatOptions 
       for await (const chunk of clientSideOpenAI.current.streamChat(messagesToSend)) {
         if (chunk.done) break;
         
-        fullContent += chunk.content;
+        // Handle text content
+        if (chunk.content) {
+          fullContent += chunk.content;
+        }
+        
+        // Handle tool results
+        if (chunk.toolResults && chunk.toolResults.length > 0) {
+          // Format tool results as readable content
+          const toolResultsText = chunk.toolResults.map(result => {
+            if (result.error) {
+              return `\n❌ Error executing ${result.toolName}: ${result.error}`;
+            }
+            
+            // Format the result data nicely
+            let formattedResult = `\n🔍 **${result.toolName}** results:\n`;
+            
+            if (result.result && typeof result.result === 'object') {
+              // Handle different result formats
+              if (result.result.datacenter) {
+                // Single datacenter result
+                formattedResult += `**${result.result.datacenter}** (${result.result.region})\n`;
+                formattedResult += `- GPUs: ${result.result.gpuCount}/${result.result.totalCapacity}\n`;
+                formattedResult += `- Utilization: ${result.result.utilization}\n`;
+                formattedResult += `- Power: ${result.result.powerUsage || result.result.powerUsage}\n`;
+                formattedResult += `- Type: ${result.result.type}\n`;
+                formattedResult += `- Status: ${result.result.status}\n`;
+              } else if (result.result.datacenters && Array.isArray(result.result.datacenters)) {
+                // Multiple datacenters result
+                formattedResult += `Found ${result.result.datacenters.length} matching datacenters:\n`;
+                result.result.datacenters.slice(0, 5).forEach(dc => {
+                  formattedResult += `- **${dc.name}** (${dc.region}): ${dc.deployedGPUs || dc.capacity_used}/${dc.capacity || dc.capacity_total} GPUs, ${dc.utilization}% util\n`;
+                });
+                if (result.result.datacenters.length > 5) {
+                  formattedResult += `... and ${result.result.datacenters.length - 5} more\n`;
+                }
+              } else if (result.result.totalPower) {
+                // Power consumption result
+                formattedResult += `Total Power: **${result.result.totalPower} ${result.result.unit}**\n`;
+                formattedResult += `Datacenters: ${result.result.datacenters} (${result.result.onlineDatacenters} online)\n`;
+                if (result.result.averagePowerPerDC) {
+                  formattedResult += `Average per DC: ${result.result.averagePowerPerDC} MW\n`;
+                }
+                if (result.result.breakdown) {
+                  formattedResult += `\nTop power consumers:\n`;
+                  result.result.breakdown.slice(0, 3).forEach(dc => {
+                    formattedResult += `- ${dc.name}: ${dc.power} MW (${dc.status})\n`;
+                  });
+                }
+              } else if (result.result.recommendations) {
+                // Underutilized resources result
+                formattedResult += `Available Capacity: **${result.result.totalAvailableCapacity} GPUs**\n`;
+                if (result.result.potentialPowerSavings) {
+                  formattedResult += `Potential Savings: ${result.result.potentialPowerSavings} MW\n`;
+                }
+                formattedResult += `\nRecommendations:\n`;
+                result.result.recommendations.forEach(rec => {
+                  formattedResult += `• ${rec}\n`;
+                });
+              }
+            }
+            
+            return formattedResult;
+          }).join('\n');
+          
+          fullContent += toolResultsText;
+        }
         
         // Update the assistant message content
         setClientMessages(prev => 

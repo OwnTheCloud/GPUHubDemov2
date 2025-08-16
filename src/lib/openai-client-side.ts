@@ -1,7 +1,9 @@
 /**
  * Client-side OpenAI integration for Power Platform deployment
- * This bypasses the need for a local Express server
+ * This bypasses the need for a local Express server and includes function calling
  */
+
+import { toolDefinitions, executeToolWithDuckDB } from './chat-tools';
 
 interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant';
@@ -11,10 +13,22 @@ interface OpenAIMessage {
 interface StreamResponse {
   content: string;
   done: boolean;
+  toolCalls?: Record<string, unknown>[];
+  toolResults?: Record<string, unknown>[];
 }
 
-// System prompt for GPU Assistant
-const GPU_SYSTEM_PROMPT = `You are a GPU Assistant for a GPU infrastructure management platform. Help users analyze GPU deployments, power consumption, and performance metrics.`;
+// Enhanced system prompt for GPU Assistant with tool context
+const GPU_SYSTEM_PROMPT = `You are a GPU Assistant for a GPU infrastructure management platform with access to real-time datacenter data.
+
+Available data includes:
+- 9 GPU datacenters across multiple regions (US, EU, APAC)
+- GPU capacity, utilization, and deployment metrics
+- Power consumption and efficiency data
+- Status monitoring and operational insights
+
+Use the provided tools to query specific data when users ask questions. Format responses with clear summaries and relevant metrics. Always provide context and actionable insights.
+
+When calling tools, explain what data you're retrieving and provide meaningful analysis of the results.`;
 
 export class ClientSideOpenAI {
   private apiKey: string;
@@ -59,7 +73,9 @@ export class ClientSideOpenAI {
           model: this.model,
           messages: messagesWithSystem,
           temperature: 0.7,
-          max_tokens: 1000,
+          max_tokens: 1500,
+          tools: toolDefinitions,
+          tool_choice: 'auto',
           stream: true
         }),
         signal: this.controller.signal
@@ -77,12 +93,17 @@ export class ClientSideOpenAI {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      const toolCalls: Array<Record<string, any>> = [];
 
       try {
         while (true) {
           const { done, value } = await reader.read();
           
           if (done) {
+            // Execute any pending tool calls before finishing
+            if (toolCalls.length > 0) {
+              yield { content: '', done: false, toolCalls, toolResults: await this.executeTools(toolCalls) };
+            }
             yield { content: '', done: true };
             break;
           }
@@ -96,6 +117,10 @@ export class ClientSideOpenAI {
               const data = line.slice(6);
               
               if (data === '[DONE]') {
+                // Execute any pending tool calls before finishing
+                if (toolCalls.length > 0) {
+                  yield { content: '', done: false, toolCalls, toolResults: await this.executeTools(toolCalls) };
+                }
                 yield { content: '', done: true };
                 return;
               }
@@ -104,8 +129,34 @@ export class ClientSideOpenAI {
                 const json = JSON.parse(data);
                 const delta = json.choices?.[0]?.delta;
                 
+                // Handle text content
                 if (delta?.content) {
                   yield { content: delta.content, done: false };
+                }
+                
+                // Handle tool calls
+                if (delta?.tool_calls) {
+                  for (const toolCall of delta.tool_calls) {
+                    // Find existing tool call or create new one
+                    let existingCall = toolCalls.find(tc => tc.index === toolCall.index);
+                    
+                    if (!existingCall) {
+                      existingCall = {
+                        id: toolCall.id,
+                        type: 'function',
+                        function: { name: '', arguments: '' },
+                        index: toolCall.index
+                      };
+                      toolCalls.push(existingCall);
+                    }
+                    
+                    // Update tool call data
+                    if (toolCall.id) existingCall.id = toolCall.id;
+                    if (toolCall.function?.name) existingCall.function.name = toolCall.function.name;
+                    if (toolCall.function?.arguments) {
+                      existingCall.function.arguments += toolCall.function.arguments;
+                    }
+                  }
                 }
               } catch (parseError) {
                 // Skip non-JSON lines
@@ -123,6 +174,36 @@ export class ClientSideOpenAI {
       }
       throw error;
     }
+  }
+
+  private async executeTools(toolCalls: Array<Record<string, any>>): Promise<Array<Record<string, any>>> {
+    const results = [];
+    
+    for (const toolCall of toolCalls) {
+      try {
+        console.log(`🔧 Executing client-side tool: ${toolCall.function.name}`);
+        const args = JSON.parse(toolCall.function.arguments || '{}');
+        const result = await executeToolWithDuckDB(toolCall.function.name, args);
+        
+        results.push({
+          toolCallId: toolCall.id,
+          toolName: toolCall.function.name,
+          args,
+          result
+        });
+        
+        console.log(`✅ Client-side tool result:`, result);
+      } catch (error) {
+        console.error(`❌ Client-side tool execution error:`, error);
+        results.push({
+          toolCallId: toolCall.id,
+          toolName: toolCall.function.name,
+          error: error.message
+        });
+      }
+    }
+    
+    return results;
   }
 
   stop() {
