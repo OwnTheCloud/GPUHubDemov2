@@ -72,16 +72,16 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
     initialMessages,
   });
 
-  // GPU-related prompt suggestions
+  // GPU-related prompt suggestions for the Chat component
   const suggestions = [
     "Show me GPU utilization across all datacenters",
-    "What are the current power consumption trends?", 
+    "What are the current power consumption trends?",
     "Which GPUs are available for deployment?",
     "Analyze the latest investigation signals",
     "How many H100s are deployed in Virginia Prime?",
   ];
 
-  // Starter prompt buttons with specific data queries
+  // Starter prompt buttons with specific data queries (shown only initially)
   const starterPrompts = [
     {
       icon: Database,
@@ -102,6 +102,9 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
       prompt: "Show me underutilized GPU resources and optimization opportunities. Include specific recommendations.",
     }
   ];
+
+  // Show starter prompts only when there's just the welcome message
+  const showStarterPrompts = messages.length <= 1;
 
   return (
     <div
@@ -172,10 +175,10 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
 
           {/* Chat Content */}
           <div className="flex-1 overflow-hidden p-2">
-            <div className="h-full bg-card border border-sidebar-border rounded-lg">
-              {/* Starter prompts when no messages */}
-              {messages.length <= 1 && (
-                <div className="p-4 space-y-3">
+            <div className="h-full bg-card border border-sidebar-border rounded-lg flex flex-col">
+              {/* Starter prompts when only welcome message exists */}
+              {showStarterPrompts && (
+                <div className="p-4 border-b border-sidebar-border">
                   <div className="text-center mb-4">
                     <h4 className="text-sm font-medium text-sidebar-foreground mb-1">
                       GPU Infrastructure Assistant
@@ -221,7 +224,7 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
                   </div>
                 </div>
               )}
-              
+
               {error && (
                 <div className="p-4 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
                   <div className="text-red-800 dark:text-red-200 text-sm">
@@ -257,7 +260,7 @@ export default function AppChatPanel({ className }: AppChatPanelProps) {
                 stop={stop}
                 append={append}
                 suggestions={suggestions}
-                className="h-full p-4"
+                className="flex-1 p-4"
               />
             </div>
           </div>
