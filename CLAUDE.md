@@ -21,37 +21,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Note**: The API integration bypasses Vercel AI SDK's streamText due to compatibility issues and uses direct OpenAI API calls with custom stream formatting. The server sends proper AI SDK data stream format including required `message_annotations` array (`8:[]`) to prevent parsing errors.
 
-### Power Platform Development
-- `npm run dev:power` - Start both Vite and PAC code servers (Windows only)
-- `pac code init -n "App Name" -env <environmentId>` - Initialize Power Platform app
-- `pac code add-data-source -a <apiId> -c <connectionId>` - Add data connections
-- `pac code push` - Deploy to Power Platform (after npm run build)
-
-### Power Platform Authentication
-```bash
-pac auth create --environment {environment-id}
-```
+### Power Platform Development (Legacy - SDK Removed)
+- Power Platform SDK has been removed from this project
+- Use `npm run dev` for local development
+- Power Platform compatibility features remain (HashRouter, environment detection)
 
 ## Architecture Overview
 
 ### Core Application Structure
 The app uses a multi-provider wrapper pattern in `main.tsx`:
 ```
-PowerProvider (Power Platform SDK initialization with error suppression)
-  → App (Contains all other providers)
-    → QueryClientProvider (React Query for async state)
-    → ThemeProvider (Dark mode with next-themes, defaults to dark)
-    → TooltipProvider (ShadCN tooltips)
-    → BrowserRouter/HashRouter (Auto-detects Power Platform via hostname)
-    → ChatPanelProvider (AI chat panel state management)
-    → SidebarProvider (ShadCN sidebar collapsible state)
-      → MainLayout (3-panel: sidebar + main content + chat panel)
+App (Contains all providers)
+  → QueryClientProvider (React Query for async state)
+  → ThemeProvider (Dark mode with next-themes, defaults to dark)
+  → TooltipProvider (ShadCN tooltips)
+  → BrowserRouter/HashRouter (Auto-detects Power Platform via hostname)
+  → ChatPanelProvider (AI chat panel state management)
+  → SidebarProvider (ShadCN sidebar collapsible state)
+    → MainLayout (3-panel: sidebar + main content + chat panel)
 ```
 
-### Power Platform Integration
-- **PowerProvider** (`src/PowerProvider.tsx`): Initializes `@pa-client/power-code-sdk` 
-- **Vite Config**: Configured for Power Platform with port 3000, host "::", and base "./"
-- **Build Target**: Power Platform requires specific TypeScript and build configurations
+### Power Platform Integration (Legacy - SDK Removed)
+- **SDK Removed**: Power Platform SDK has been removed from this project
+- **Environment Detection**: Uses `src/lib/environment.ts` for Power Platform detection
+- **Vite Config**: Still configured for Power Platform with port 3000, host "::", and base "./"
+- **Build Target**: Power Platform build configurations remain for compatibility
 
 ### Layout Architecture  
 - **Three-Panel Layout**: Left sidebar (navigation) + Main content + Right sidebar (AI chat)
@@ -150,17 +144,11 @@ Must use port 3000 for Power Platform compatibility. Never change this in vite.c
 - Path aliases configured with `@/*` pointing to `./src/*`
 - `skipLibCheck: true` and `allowJs: true` for compatibility
 
-#### SDK Usage
-Power Platform SDK is initialized in PowerProvider with error suppression:
-- Suppresses MutationObserver and web-client-content-script errors
-- Graceful fallback if SDK initialization fails
-- Loading state shown during initialization
-
-For data connections:
-1. `pac auth create --environment {environment-id}`
-2. `pac code add-data-source -a <apiId> -c <connectionId>`
-3. Generated Models and Services appear in `src/Models` and `src/Services`
-4. Schema references available in `.power/schemas`
+#### Legacy SDK Information (Removed)
+Power Platform SDK has been removed from this project:
+- No longer requires SDK initialization
+- Environment detection handled via browser APIs
+- Power Platform features work through environment-aware implementations
 
 #### Deployment Process
 1. `npm run build`
@@ -200,8 +188,7 @@ src/
 ├── types/                 # TypeScript type definitions
 │   └── asset.ts           # Asset type definitions
 ├── App.tsx               # Provider setup and routing logic
-├── main.tsx              # Entry point with PowerProvider
-├── PowerProvider.tsx     # Power Platform SDK with error handling
+├── main.tsx              # Entry point (PowerProvider removed)
 public/
 ├── favicon.png          # 512x512 GPU chip favicon
 └── gpu-icon.png         # Original GPU icon for high-res displays
@@ -217,8 +204,8 @@ start-dev.sh             # Development startup script
 - Mock data is structured to demonstrate table functionality
 - Chart colors are defined in CSS custom properties in `index.css`
 - Power Platform deployment requires "first release" region environments
-- MutationObserver errors are suppressed in Power Platform context (handled in PowerProvider)
 - Router automatically switches between BrowserRouter and HashRouter based on environment
+- Power Platform SDK has been removed but compatibility features remain
 - Favicon is a GPU chip icon from UXWing (commercial use allowed) in `public/` directory
 
 ## Critical API Server Notes
