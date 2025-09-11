@@ -21,31 +21,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Note**: The API integration bypasses Vercel AI SDK's streamText due to compatibility issues and uses direct OpenAI API calls with custom stream formatting. The server sends proper AI SDK data stream format including required `message_annotations` array (`8:[]`) to prevent parsing errors.
 
-### Power Platform Development (Legacy - SDK Removed)
-- Power Platform SDK has been removed from this project
-- Use `npm run dev` for local development
-- Power Platform compatibility features remain (HashRouter, environment detection)
+### Power Platform Development
+- `npm run dev:power` - Start Vite dev server with Power Platform CLI (requires pac cli)
+- `npm run build:power` - Build and deploy to Power Platform
+- `npm run deploy` - Deploy to Power Platform (pac code push)
+- Power Platform SDK integrated with environment-aware initialization
+- Uses defensive DOM mounting to prevent MutationObserver errors
 
 ## Architecture Overview
 
 ### Core Application Structure
 The app uses a multi-provider wrapper pattern in `main.tsx`:
 ```
-App (Contains all providers)
-  → QueryClientProvider (React Query for async state)
-  → ThemeProvider (Dark mode with next-themes, defaults to dark)
-  → TooltipProvider (ShadCN tooltips)
-  → BrowserRouter/HashRouter (Auto-detects Power Platform via hostname)
-  → ChatPanelProvider (AI chat panel state management)
-  → SidebarProvider (ShadCN sidebar collapsible state)
-    → MainLayout (3-panel: sidebar + main content + chat panel)
+PowerProvider (Power Platform SDK initialization with defensive DOM mounting)
+  → App (Contains all providers)
+    → QueryClientProvider (React Query for async state)
+    → ThemeProvider (Dark mode with next-themes, defaults to dark)
+    → TooltipProvider (ShadCN tooltips)
+    → BrowserRouter/HashRouter (Auto-detects Power Platform via hostname)
+    → ChatPanelProvider (AI chat panel state management)
+    → SidebarProvider (ShadCN sidebar collapsible state)
+      → MainLayout (3-panel: sidebar + main content + chat panel)
 ```
 
-### Power Platform Integration (Legacy - SDK Removed)
-- **SDK Removed**: Power Platform SDK has been removed from this project
+### Power Platform Integration
+- **SDK Restored**: Power Platform SDK (@microsoft/power-apps) integrated with environment-aware initialization
+- **PowerProvider**: `src/PowerProvider.tsx` handles SDK initialization and error states
 - **Environment Detection**: Uses `src/lib/environment.ts` for Power Platform detection
-- **Vite Config**: Still configured for Power Platform with port 3000, host "::", and base "./"
-- **Build Target**: Power Platform build configurations remain for compatibility
+- **Defensive DOM Mounting**: `src/main.tsx` includes retry logic and error handling to prevent MutationObserver errors
+- **Vite Config**: Configured for Power Platform with port 3000, host "::", and base "./"
+- **Build Target**: Full Power Platform deployment support restored
 
 ### Layout Architecture  
 - **Three-Panel Layout**: Left sidebar (navigation) + Main content + Right sidebar (AI chat)
