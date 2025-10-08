@@ -1,11 +1,11 @@
 {
-  "appId": "d75903ae-bd8b-48b4-b86d-4810eed3f746",
-  "appDisplayName": "GPUHubDemov2",
+  "appId": "ae076643-42d6-4275-850c-e18cc192e6f0",
+  "appDisplayName": "GPUHubDemo",
   "description": null,
   "environmentId": "08d661af-022e-ef6a-88c3-50f55b186209",
   "buildPath": "./dist",
   "buildEntryPoint": "index.html",
-  "logoPath": "Default",
+  "logoPath": "/home/cole/GPUHubDemov2/GPUHubDemo/public/favicon-blue.svg",
   "localAppUrl": "http://localhost:3000/",
   "connectionReferences": {}
 }
