@@ -31,73 +31,137 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture Overview
 
 ### Core Application Structure
-The app uses a multi-provider wrapper pattern in `main.tsx`:
+The app uses a sophisticated multi-provider wrapper pattern with hybrid data architecture:
+
 ```
-PowerProvider (Power Platform SDK initialization with defensive DOM mounting)
-  → App (Contains all providers)
+PowerProvider (Power Platform SDK + MutationObserver protection)
+  → App (Router + Core Providers)
     → QueryClientProvider (React Query for async state)
-    → ThemeProvider (Dark mode with next-themes, defaults to dark)
+    → ThemeProvider (Dark mode via next-themes, defaults to dark)
+    → DuckDBProvider (In-browser SQL.js database)
     → TooltipProvider (ShadCN tooltips)
-    → BrowserRouter/HashRouter (Auto-detects Power Platform via hostname)
-    → ChatPanelProvider (AI chat panel state management)
-    → SidebarProvider (ShadCN sidebar collapsible state)
-      → MainLayout (3-panel: sidebar + main content + chat panel)
+    → Router (BrowserRouter/HashRouter auto-switching)
+    → DataProvider (Legacy mock data context)
+    → ChatPanelProvider (AI chat panel state)
+    → SidebarProvider (Collapsible sidebar state)
+      → MainLayout (3-panel layout)
 ```
 
-### Power Platform Integration
-- **SDK Restored**: Power Platform SDK (@microsoft/power-apps) integrated with environment-aware initialization
-- **PowerProvider**: `src/PowerProvider.tsx` handles SDK initialization and error states
-- **Environment Detection**: Uses `src/lib/environment.ts` for Power Platform detection
-- **Defensive DOM Mounting**: `src/main.tsx` includes retry logic and error handling to prevent MutationObserver errors
-- **Vite Config**: Configured for Power Platform with port 3000, host "::", and base "./"
-- **Build Target**: Full Power Platform deployment support restored
+### Hybrid Data Architecture
 
-### Layout Architecture  
-- **Three-Panel Layout**: Left sidebar (navigation) + Main content + Right sidebar (AI chat)
-- **Dynamic Routing**: Auto-detects Power Platform context via `window.location.hostname.includes('powerapps.com')`
-- **Responsive Design**: Chat panel (fixed right, 24rem when expanded, 3rem when collapsed) adjusts main content padding
-- **Chat Panel States**: Collapsed (12px width with toggle button) and expanded (384px width with full interface)
+The application implements a **progressive migration from mock data to SQL.js in-browser database**:
 
-### Navigation Architecture
-- **Dual Sidebar Modes**: Uses ShadCN sidebar with `collapsible="icon"` 
-  - Expanded: Shows grouped collapsible sections (CO+I Signals, CSCP Signals)
-  - Collapsed: Shows individual icons with tooltips
-- **Conditional Rendering**: Menu items change based on sidebar state using `group-data-[state=*]` classes
-- **Route Structure**: 7 pages organized in domain groups (signals/, cscp/)
+#### SQL.js Database Layer (`src/db/sqljs-manager.ts`)
+- In-browser SQLite database using SQL.js WASM
+- 8 core tables: `assets`, `investigation_signals`, `execution_signals`, `datacenters`, `stamps`, `demand_ids`, `universal_supply`, `dashboard_metrics`
+- Full transaction support, prepared statements, and batch operations
+- Defensive initialization with retry logic and comprehensive error handling
 
-### AI Chat Integration
-- **Direct OpenAI Integration**: Uses custom working-api-server.js that bypasses Vercel AI SDK issues
-- **Chat Panel**: Fixed position right sidebar (app-chatpanel.tsx) with collapsible functionality
-- **Stream Processing**: Custom stream format conversion from OpenAI SSE to AI SDK data stream format
-  - Sends `0:"text"` for content chunks
-  - Sends `8:[]` for message_annotations (required empty array)
-  - Sends `d:{finishReason,usage}` for completion data
-- **Provider Pattern**: ChatPanelProvider manages isExpanded state and toggleExpanded callback
-- **GPU-Specific Context**: System prompt and suggestions tailored for GPU infrastructure management
-- **Error Handling**: Displays API key configuration errors and connection issues
-- **API Server**: Runs on port 3333 with CORS, health check endpoint, and proper error handling
+#### Legacy Mock Data Layer (`src/contexts/data-context.tsx`)  
+- Maintains compatibility with components not yet migrated
+- Provides cached stats and periodic refresh (30s intervals)
+- Used as fallback when database operations fail
 
-### Data Layer
-- **Mock Data**: Located in `src/data/` (assets.ts, owners.ts) for demonstration
-- **Data Tables**: Reusable `DataTable` component using TanStack Table v8 with editable cells
-- **State Management**: React Query for async state, React hooks for local state
-- **Auto-save**: Built-in auto-save functionality via use-auto-save.tsx hook
-- **Editable Components**: Custom editable-cell.tsx, editable-input.tsx, editable-select.tsx
-- **Export/Import**: CSV export functionality with bulk operations support
+#### Hook-based Data Access (`src/hooks/use-duckdb.tsx`)
+- Comprehensive set of query and mutation hooks for each table
+- Auto-save functionality and optimistic updates
+- Type-safe database operations with proper error boundaries
 
-### UI System
-- **Design System**: ShadCN UI components (`src/components/ui/`) built on Radix UI primitives
-- **Theming**: TailwindCSS with CSS custom properties, next-themes for dark mode (defaults to dark)
-- **Icons**: Lucide React throughout (Home, Box, Database, Cpu, Activity, etc.)
-- **Charts**: Recharts with custom ShadCN chart components
-- **Chat Components**: Custom chat interface (chat.tsx, message-list.tsx, markdown-renderer.tsx) with syntax highlighting via Shiki
-- **Audio Components**: Audio visualizer and recording capabilities (audio-visualizer.tsx, use-audio-recording.ts)
-- **Mobile Detection**: use-mobile.tsx hook for responsive behavior
+### Power Platform Integration Strategy
 
-## Key Patterns
+**Environment-aware dual deployment** with automatic detection:
 
-### Page Structure
-All pages follow this pattern:
+#### PowerProvider (`src/PowerProvider.tsx`)
+- Dynamic SDK initialization only in Power Platform environments
+- **MutationObserver Protection**: Custom wrapper prevents runtime errors from browser extensions
+- Graceful degradation with comprehensive error boundaries
+- Cleanup functions prevent memory leaks
+
+#### Environment Detection (`src/lib/environment.ts`)
+- Automatic Power Platform detection via hostname patterns
+- Router switching: BrowserRouter (local) ↔ HashRouter (Power Platform)
+- Environment-specific feature flags and configurations
+
+#### Dual-Mode Chat System
+- **Local Development**: Express server (`working-api-server.js`) with OpenAI proxy and tool execution
+- **Power Platform**: Client-side OpenAI integration (`ClientSideOpenAI`) to bypass 405 errors
+- Automatic fallback and visual mode indicators in chat header
+
+### Advanced Navigation Architecture
+
+#### Dual Display Sidebar Pattern
+Uses `group-data-[state=*]` classes for contextual rendering:
+- **Expanded**: Hierarchical collapsible sections (CO+I Signals, CSCP Signals)
+- **Collapsed**: Flattened individual icons with tooltips
+- Navigation arrays: `menuItems`, `coiSignals`, `cscpSignals` in `app-sidebar.tsx`
+
+#### Three-Panel Responsive Layout
+```
+[Sidebar] [Main Content with dynamic padding] [Chat Panel]
+```
+- Chat panel: 384px expanded ↔ 48px collapsed with smooth transitions
+- Main content automatically adjusts padding based on chat panel state
+- Sidebar: Icon mode vs full navigation with persistent state
+
+### Streaming AI Integration
+
+#### Custom Stream Processing
+Converts OpenAI Server-Sent Events to AI SDK data stream format:
+- Text chunks: `0:"content"`
+- Tool calls: `9:{toolCallId, toolName, args, result}`
+- Message annotations: `8:[]` (required empty array to prevent parsing errors)
+- Completion data: `d:{finishReason, usage}`
+
+#### Tool Execution with Database Integration
+- Function calling for GPU datacenter queries using SQL.js database
+- Fallback to legacy mock data if database queries fail
+- Real-time metrics calculation and intelligent caching
+- Error boundaries prevent tool failures from breaking chat flow
+
+### Advanced UI Component System
+
+#### ShadCN Foundation with Extensions
+- 50+ UI components built on Radix UI primitives with custom extensions
+- **Editable Data Tables**: TanStack Table v8 with inline editing, auto-save, and CSV export
+- **Advanced Charts**: Recharts with custom ShadCN chart components and interactive drill-downs
+- **Chat Interface**: Full AI integration with syntax highlighting (Shiki), audio visualizer, and streaming
+
+#### Theming and Styling
+- TailwindCSS with CSS custom properties for dynamic theming
+- Dark mode via next-themes (defaults to dark) with system detection
+- Comprehensive color system supporting both light and dark modes
+- Custom chart colors defined in CSS custom properties
+
+## Key Architectural Patterns
+
+### Database Migration Pattern
+Components progressively migrate from mock data to SQL.js:
+```tsx
+// Hook-based approach allows gradual migration
+const { data, loading, error } = useAssets(); // Tries SQL.js first, falls back to mock data
+```
+
+### Environment-Aware Component Pattern
+```tsx
+// Components adapt behavior based on deployment environment
+const chat = useEnvironmentAwareChat(); // Different implementations for local vs Power Platform
+```
+
+### Provider Composition Pattern
+Each provider handles a specific concern with clear boundaries:
+- **PowerProvider**: Platform integration and error handling
+- **DuckDBProvider**: Database state and connection management  
+- **ChatPanelProvider**: AI chat state and panel management
+- **DataProvider**: Legacy data compatibility layer
+
+### Defensive Programming Pattern
+- MutationObserver protection prevents external script errors
+- Database operations have comprehensive retry logic
+- Component error boundaries prevent cascade failures
+- Global error handlers for uncaught exceptions
+
+### Page Structure Pattern
+All pages follow consistent structure:
 ```tsx
 export default function PageName() {
   return (
@@ -109,8 +173,7 @@ export default function PageName() {
 }
 ```
 
-### Data Table Columns
-Use TanStack Table column definitions with ShadCN Badge components for status:
+### Data Table Column Pattern
 ```tsx
 const columns: ColumnDef<Type>[] = [
   {
@@ -121,133 +184,66 @@ const columns: ColumnDef<Type>[] = [
       </Button>
     ),
   },
-  // Status columns use Badge component
+  // Status columns use Badge component with consistent styling
 ];
 ```
 
-### Sidebar Menu Configuration
-Navigation is defined in three arrays in `app-sidebar.tsx`:
-- `menuItems`: Top-level pages (Home, Universal Supply)
-- `coiSignals`: CO+I Signals group (Investigation Signals, Execution Signals)
-- `cscpSignals`: CSCP Signals group (Datacenters, Stamps, Demand IDs)
+## Power Platform Specific Requirements
 
-**Dual Display Logic**: Uses `group-data-[state=*]` classes to show:
-- Expanded: Collapsible groups with sub-items
-- Collapsed: Individual icons with tooltips (all items flattened)
+### Critical Configuration
+- **Port 3000**: Required for Power Platform compatibility, never change in vite.config.ts
+- **Vite External Modules**: Power Platform SDK must be in `rollupOptions.external` to prevent bundling errors
+- **TypeScript**: Relaxed type checking with `noImplicitAny: false`, `strictNullChecks: false` for compatibility
 
-### Power Platform Specific Requirements
-
-#### Port Configuration
-Must use port 3000 for Power Platform compatibility. Never change this in vite.config.ts.
-
-#### TypeScript Configuration
-- Relaxed type checking for Power Platform compatibility:
-  - `noImplicitAny: false`
-  - `strictNullChecks: false` 
-  - `noUnusedParameters: false`
-  - `noUnusedLocals: false`
-- Path aliases configured with `@/*` pointing to `./src/*`
-- `skipLibCheck: true` and `allowJs: true` for compatibility
-
-#### Legacy SDK Information (Removed)
-Power Platform SDK has been removed from this project:
-- No longer requires SDK initialization
-- Environment detection handled via browser APIs
-- Power Platform features work through environment-aware implementations
-
-#### Deployment Process
-1. `npm run build`
-2. `pac code push`
-
-## File Organization
-
-```
-src/
-├── components/
-│   ├── ui/                 # ShadCN components (50+ components)
-│   │   ├── chat.tsx        # Main chat interface
-│   │   ├── sidebar.tsx     # Collapsible sidebar component
-│   │   ├── editable-*.tsx  # Editable table cell components
-│   │   └── audio-*.tsx     # Audio visualization components
-│   ├── app-sidebar.tsx     # Main navigation with dual display modes
-│   ├── app-chatpanel.tsx   # AI chat panel with context provider
-│   ├── data-table.tsx      # Reusable table with TanStack Table v8
-│   ├── AssetCard.tsx       # Asset display component
-│   └── AssetDetail.tsx     # Asset detail view
-├── pages/                  # 7 total pages
-│   ├── Home.tsx            # Dashboard with Recharts area chart
-│   ├── Index.tsx           # Legacy index page
-│   ├── UniversalSupply.tsx # Supply management page
-│   ├── signals/            # CO+I Signals domain (2 pages)
-│   └── cscp/              # CSCP Signals domain (3 pages)
-├── data/                  # Mock data for demonstration
-│   ├── assets.ts          # Asset data structures
-│   └── owners.ts          # Owner/user data
-├── hooks/                 # Custom React hooks
-│   ├── use-auto-save.tsx  # Auto-save functionality
-│   ├── use-audio-recording.ts # Audio recording
-│   └── use-mobile.tsx     # Mobile detection hook
-├── lib/                   # Utility functions
-│   ├── utils.ts           # General utilities (cn, etc.)
-│   └── audio-utils.ts     # Audio processing utilities
-├── types/                 # TypeScript type definitions
-│   └── asset.ts           # Asset type definitions
-├── App.tsx               # Provider setup and routing logic
-├── main.tsx              # Entry point (PowerProvider removed)
-public/
-├── favicon.png          # 512x512 GPU chip favicon
-└── gpu-icon.png         # Original GPU icon for high-res displays
-working-api-server.js     # Express API server bypassing AI SDK issues
-start-dev.sh             # Development startup script
-```
-
-## Important Notes
-
-- Always run `npm run lint` before commits
-- Dark mode uses `next-themes` with system detection (defaults to dark theme)
-- All pages are responsive and work in sidebar collapsed mode
-- Mock data is structured to demonstrate table functionality
-- Chart colors are defined in CSS custom properties in `index.css`
-- Power Platform deployment requires "first release" region environments
-- Router automatically switches between BrowserRouter and HashRouter based on environment
-- Power Platform SDK has been removed but compatibility features remain
-- Favicon is a GPU chip icon from UXWing (commercial use allowed) in `public/` directory
-
-## Critical API Server Notes
-
-- **Stream Format**: The working-api-server.js sends AI SDK-compatible data stream format to prevent "message_annotations" parsing errors
-- **Server Restart**: After any changes to working-api-server.js, restart with `pkill -f "working-api-server.js" && node working-api-server.js &`
-- **Health Check**: Test server health at `http://localhost:3333/api/health`
-- **Environment**: Server loads `.env.local` for `VITE_OPENAI_API_KEY` and `VITE_OPENAI_MODEL`
-
-## Power Platform Deployment
-
-### Environment-Aware Chat System
-The application automatically detects the deployment environment and uses the appropriate chat integration:
-
-- **Local Development**: Uses Express server (`working-api-server.js`) via `/api/chat` proxy
-- **Power Platform**: Uses client-side OpenAI integration (`ClientSideOpenAI`) to bypass 405 errors
-
-### Key Files for Power Platform Support
-- `src/lib/environment.ts` - Environment detection utilities
-- `src/lib/openai-client-side.ts` - Client-side OpenAI integration for Power Platform
-- `src/hooks/use-environment-aware-chat.ts` - Hook that switches between server/client modes
-- `src/components/app-chatpanel.tsx` - Updated to use environment-aware chat
-
-### Power Platform Requirements
-1. **API Key Configuration**: Set `VITE_OPENAI_API_KEY` as environment variable before building
-2. **Build Process**: OpenAI API key must be available at build time (not runtime)
-3. **CORS Handling**: Client-side integration handles CORS automatically via direct OpenAI API calls
-4. **Error Handling**: 405 "UnsupportedHttpVerb" errors are handled gracefully with fallback to client mode
-
-### Deployment Checklist
-1. Set `VITE_OPENAI_API_KEY` environment variable
+### Deployment Process
+1. Set `VITE_OPENAI_API_KEY` environment variable  
 2. Optionally set `VITE_OPENAI_MODEL` (defaults to gpt-4o-mini)
-3. Run `npm run build`
-4. Run `pac code push`
-5. Verify chat functionality shows "Power Platform Mode" indicator
+3. `npm run build` (validates external dependencies)
+4. `pac code push` (deploys to Power Platform)
+5. Verify environment detection and chat mode indicators
 
-### Visual Indicators
+### Visual Environment Indicators
 - 🔵 **Wifi icon**: Power Platform client-side mode
-- 🟢 **WifiOff icon**: Local development server mode
-- Chat header shows deployment context and mode status
+- 🟢 **WifiOff icon**: Local development server mode  
+- Chat header displays deployment context and active mode
+
+## Critical Development Notes
+
+### API Server Management
+- **Stream Format**: working-api-server.js sends AI SDK-compatible format to prevent parsing errors
+- **Server Restart**: After changes: `pkill -f "working-api-server.js" && node working-api-server.js &`
+- **Health Check**: Available at `http://localhost:3333/api/health`
+- **Environment Loading**: Automatically loads `.env.local` for API keys
+
+### Database Development
+- SQL.js database initialized on first use with automatic schema creation
+- Use `useDuckDBManager()` hook to access database instance and utilities
+- Database operations are wrapped in error boundaries with mock data fallbacks
+- Always test both successful database operations and fallback scenarios
+
+### Error Handling Strategy
+- PowerProvider includes global MutationObserver protection
+- All database hooks include error boundaries and fallback logic
+- Chat system has comprehensive error handling for both local and Power Platform modes
+- Use defensive programming patterns throughout component development
+
+### Performance Considerations
+- React Query handles caching and background updates for database queries
+- SQL.js operations are batched where possible to improve performance  
+- Chart components use memoization to prevent unnecessary re-renders
+- Chat streaming is optimized with proper cleanup to prevent memory leaks
+
+## Build System Notes
+
+### Vite Configuration Essentials
+- Port 3000 and host "::" required for Power Platform
+- External modules configuration prevents bundling conflicts
+- API proxy to port 3333 for local development
+- CORS headers configured for DuckDB WASM compatibility
+
+### TypeScript Configuration  
+- Path aliases: `@/*` maps to `./src/*`
+- `skipLibCheck: true` and `allowJs: true` for maximum compatibility
+- Relaxed type checking optimized for Power Platform deployment constraints
+
+Always run `npm run lint` before commits to maintain code quality and consistency.

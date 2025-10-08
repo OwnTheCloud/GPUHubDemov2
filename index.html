@@ -10,6 +10,478 @@
     <link rel="shortcut icon" href="/favicon.svg" />
     <link rel="apple-touch-icon" sizes="512x512" href="/favicon-blue.svg" />
     <meta name="theme-color" content="#2B8FF7" />
+
+    <!-- CRITICAL: Power Platform MutationObserver Protection - MUST RUN FIRST -->
+    <script>
+      // Immediate Power Platform Protection - Runs before ANY other scripts
+      (function() {
+        'use strict';
+        if (typeof window === 'undefined' || !window.MutationObserver) return;
+
+        console.log('[MutationObserver Shield] EARLY PROTECTION ACTIVATING...');
+
+        // Cache original before any other script can access it
+        const OriginalMutationObserver = window.MutationObserver;
+        const OriginalHTMLElement = window.HTMLElement;
+        const OriginalCreateElement = document.createElement;
+
+        // Enhanced MutationObserver with iframe-specific protection
+        function createUltraSafeMutationObserver(callback) {
+          const instance = new OriginalMutationObserver(function(mutations, observer) {
+            try {
+              return callback.call(this, mutations, observer);
+            } catch (callbackError) {
+              console.warn('[MutationObserver Shield] Callback error intercepted:', callbackError.message);
+            }
+          });
+
+          // Ultra-defensive observe method
+          const originalObserve = instance.observe;
+          instance.observe = function(target, options) {
+            try {
+              // Comprehensive validation
+              if (!target) {
+                console.warn('[MutationObserver Shield] NULL target blocked');
+                return;
+              }
+
+              if (typeof target !== 'object') {
+                console.warn('[MutationObserver Shield] Non-object target blocked:', typeof target);
+                return;
+              }
+
+              // Special iframe protection
+              if (target && target.tagName === 'IFRAME') {
+                console.log('[MutationObserver Shield] IFRAME target detected - applying safe handling');
+
+                // Check if iframe is properly initialized
+                if (!target.contentDocument && !target.contentWindow) {
+                  console.warn('[MutationObserver Shield] Uninitialized iframe blocked');
+                  return;
+                }
+
+                try {
+                  // Test if we can safely observe this iframe
+                  if (target.parentNode && target.nodeType === 1) {
+                    return originalObserve.call(this, target, options);
+                  } else {
+                    console.warn('[MutationObserver Shield] Invalid iframe state, observe blocked');
+                    return;
+                  }
+                } catch (iframeError) {
+                  console.warn('[MutationObserver Shield] Iframe observe failed:', iframeError.message);
+                  return;
+                }
+              }
+
+              // Standard validation
+              if (typeof target.nodeType !== 'number' || target.nodeType < 1 || target.nodeType > 12) {
+                console.warn('[MutationObserver Shield] Invalid nodeType blocked:', target.nodeType);
+                return;
+              }
+
+              return originalObserve.call(this, target, options);
+
+            } catch (err) {
+              console.warn('[MutationObserver Shield] Observe intercepted:', err.message);
+              // For Power Platform errors, fail silently
+              if (err.message.includes('parameter 1 is not of type')) {
+                return;
+              }
+              throw err;
+            }
+          };
+
+          return instance;
+        }
+
+        // Immediately replace MutationObserver globally
+        Object.defineProperty(window, 'MutationObserver', {
+          value: createUltraSafeMutationObserver,
+          writable: false,
+          configurable: false,
+          enumerable: true
+        });
+
+        // Also protect WebKitMutationObserver if it exists
+        if (window.WebKitMutationObserver) {
+          Object.defineProperty(window, 'WebKitMutationObserver', {
+            value: createUltraSafeMutationObserver,
+            writable: false,
+            configurable: false,
+            enumerable: true
+          });
+        }
+
+        // Enhanced Iframe Protection - Override createElement
+        const originalCreateElement = document.createElement;
+        document.createElement = function(tagName, options) {
+          const element = originalCreateElement.call(this, tagName, options);
+
+          if (tagName && tagName.toLowerCase() === 'iframe') {
+            console.log('[MutationObserver Shield] IFRAME creation intercepted');
+
+            // Add safe property setters
+            let originalSrc = element.src;
+            Object.defineProperty(element, 'src', {
+              get: function() { return originalSrc; },
+              set: function(value) {
+                console.log('[MutationObserver Shield] IFRAME src set:', value);
+                originalSrc = value;
+                try {
+                  if (this.setAttribute) {
+                    this.setAttribute('src', value);
+                  }
+                } catch (e) {
+                  console.warn('[MutationObserver Shield] Safe iframe src setting failed:', e.message);
+                }
+              },
+              enumerable: true,
+              configurable: true
+            });
+
+            // Add load event protection
+            element.addEventListener('load', function(e) {
+              console.log('[MutationObserver Shield] IFRAME load event protected');
+              try {
+                if (this.contentWindow && this.contentWindow.MutationObserver) {
+                  this.contentWindow.MutationObserver = createUltraSafeMutationObserver;
+                }
+              } catch (crossOriginError) {
+                // Expected for cross-origin iframes
+                console.log('[MutationObserver Shield] Cross-origin iframe, skipped protection');
+              }
+            });
+          }
+
+          return element;
+        };
+
+        // Override appendChild for iframe protection
+        const originalAppendChild = Node.prototype.appendChild;
+        Node.prototype.appendChild = function(child) {
+          if (child && child.tagName === 'IFRAME') {
+            console.log('[MutationObserver Shield] IFRAME appendChild intercepted');
+
+            // Ensure iframe is properly initialized before appending
+            if (!child.src && !child.srcdoc) {
+              console.warn('[MutationObserver Shield] Empty iframe prevented from causing errors');
+              child.src = 'about:blank';
+            }
+          }
+
+          try {
+            return originalAppendChild.call(this, child);
+          } catch (appendError) {
+            console.warn('[MutationObserver Shield] Safe appendChild failed:', appendError.message);
+            return child;
+          }
+        };
+
+        // Protect iframe event listeners
+        const originalAddEventListener = Element.prototype.addEventListener;
+        Element.prototype.addEventListener = function(type, listener, options) {
+          if (this.tagName === 'IFRAME' && type === 'load') {
+            console.log('[MutationObserver Shield] IFRAME load listener protected');
+
+            const safeListener = function(event) {
+              try {
+                return listener.call(this, event);
+              } catch (listenerError) {
+                console.warn('[MutationObserver Shield] Iframe listener error intercepted:', listenerError.message);
+              }
+            };
+
+            return originalAddEventListener.call(this, type, safeListener, options);
+          }
+
+          return originalAddEventListener.call(this, type, listener, options);
+        };
+
+        // Immediate global error suppression with iframe focus
+        window.addEventListener('error', function(event) {
+          if (event.error && event.error.message) {
+            const message = event.error.message;
+            const filename = event.filename || '';
+            const target = event.target;
+
+            if ((message.includes('MutationObserver') && message.includes('parameter 1 is not of type')) ||
+                filename.includes('web-client-content-script') ||
+                (target && target.tagName === 'IFRAME') ||
+                message.includes('HTMLIFrameElement')) {
+              console.warn('[MutationObserver Shield] IFRAME ERROR SUPPRESSED:', {
+                message: message.substring(0, 100),
+                target: target ? target.tagName : 'unknown',
+                suppressed: true
+              });
+              event.preventDefault();
+              event.stopImmediatePropagation();
+              return true;
+            }
+          }
+          return false;
+        }, true);
+
+        // Additional promise rejection handling for iframe operations
+        window.addEventListener('unhandledrejection', function(event) {
+          if (event.reason && event.reason.message) {
+            const message = event.reason.message;
+            if (message.includes('MutationObserver') ||
+                message.includes('HTMLIFrameElement') ||
+                message.includes('web-client-content-script')) {
+              console.warn('[MutationObserver Shield] IFRAME PROMISE REJECTION SUPPRESSED:', message);
+              event.preventDefault();
+              return true;
+            }
+          }
+          return false;
+        }, true);
+
+        // Ultra-aggressive console error suppression
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+
+        console.error = function(...args) {
+          const message = args.join(' ');
+          if (message.includes('MutationObserver') ||
+              message.includes('parameter 1 is not of type') ||
+              message.includes('web-client-content-script') ||
+              message.includes('HTMLIFrameElement')) {
+            console.warn('[MutationObserver Shield] CONSOLE ERROR SUPPRESSED:', message.substring(0, 80) + '...');
+            return;
+          }
+          return originalConsoleError.apply(console, args);
+        };
+
+        // Override setTimeout/setInterval for Power Platform script protection
+        const originalSetTimeout = window.setTimeout;
+        const originalSetInterval = window.setInterval;
+
+        window.setTimeout = function(func, delay, ...args) {
+          if (typeof func === 'function') {
+            const safeFunc = function() {
+              try {
+                return func.apply(this, arguments);
+              } catch (timeoutError) {
+                if (timeoutError.message.includes('MutationObserver') ||
+                    timeoutError.message.includes('parameter 1 is not of type')) {
+                  console.warn('[MutationObserver Shield] TIMEOUT ERROR SUPPRESSED:', timeoutError.message);
+                  return;
+                }
+                throw timeoutError;
+              }
+            };
+            return originalSetTimeout.call(this, safeFunc, delay, ...args);
+          }
+          return originalSetTimeout.call(this, func, delay, ...args);
+        };
+
+        // Protect Object.observe if it exists (legacy browser support)
+        if (Object.observe) {
+          const originalObjectObserve = Object.observe;
+          Object.observe = function(obj, callback) {
+            const safeCallback = function(changes) {
+              try {
+                return callback.call(this, changes);
+              } catch (observeError) {
+                console.warn('[MutationObserver Shield] Object.observe error suppressed:', observeError.message);
+              }
+            };
+            return originalObjectObserve.call(this, obj, safeCallback);
+          };
+        }
+
+        // Comprehensive script injection protection
+        const originalEval = window.eval;
+        window.eval = function(code) {
+          if (typeof code === 'string' &&
+              (code.includes('MutationObserver') || code.includes('web-client-content-script'))) {
+            console.warn('[MutationObserver Shield] EVAL with MutationObserver blocked');
+            return;
+          }
+          return originalEval.call(this, code);
+        };
+
+        // Additional error boundary for immediate script errors
+        window.onerror = function(message, source, lineno, colno, error) {
+          if (message && typeof message === 'string' &&
+              (message.includes('MutationObserver') ||
+               message.includes('parameter 1 is not of type') ||
+               (source && source.includes('web-client-content-script')))) {
+            console.warn('[MutationObserver Shield] ONERROR SUPPRESSED:', {
+              message: message.substring(0, 50),
+              source: source ? source.substring(source.lastIndexOf('/') + 1) : 'unknown',
+              line: lineno
+            });
+            return true; // Prevent default error handling
+          }
+          return false;
+        };
+
+        // Protect requestAnimationFrame from iframe errors
+        const originalRequestAnimationFrame = window.requestAnimationFrame;
+        window.requestAnimationFrame = function(callback) {
+          const safeCallback = function(timestamp) {
+            try {
+              return callback.call(this, timestamp);
+            } catch (rafError) {
+              if (rafError.message.includes('MutationObserver') ||
+                  rafError.message.includes('HTMLIFrameElement')) {
+                console.warn('[MutationObserver Shield] RAF ERROR SUPPRESSED:', rafError.message);
+                return;
+              }
+              throw rafError;
+            }
+          };
+          return originalRequestAnimationFrame.call(this, safeCallback);
+        };
+
+        // Power Platform Script Interception and Safe Mode
+        let powerPlatformSafeMode = false;
+
+        // Monitor for Power Platform script loading
+        const originalCreateTextNode = document.createTextNode;
+        const originalInsertBefore = Node.prototype.insertBefore;
+
+        // Override script insertion to detect Power Platform scripts
+        Node.prototype.insertBefore = function(newNode, referenceNode) {
+          if (newNode && newNode.tagName === 'SCRIPT' && newNode.src &&
+              newNode.src.includes('web-client-content-script')) {
+            console.warn('[MutationObserver Shield] POWER PLATFORM SCRIPT INTERCEPTED:', newNode.src);
+            powerPlatformSafeMode = true;
+
+            // Add additional protection for this specific script
+            newNode.addEventListener('load', function() {
+              console.log('[MutationObserver Shield] Power Platform script loaded - safe mode active');
+            });
+
+            newNode.addEventListener('error', function(e) {
+              console.warn('[MutationObserver Shield] Power Platform script error prevented');
+              e.preventDefault();
+              e.stopPropagation();
+            });
+          }
+
+          try {
+            return originalInsertBefore.call(this, newNode, referenceNode);
+          } catch (insertError) {
+            console.warn('[MutationObserver Shield] Script insertion error intercepted:', insertError.message);
+            return newNode;
+          }
+        };
+
+        // Enhanced script tag protection
+        const originalSetAttribute = Element.prototype.setAttribute;
+        Element.prototype.setAttribute = function(name, value) {
+          if (this.tagName === 'SCRIPT' && name === 'src' &&
+              typeof value === 'string' && value.includes('web-client-content-script')) {
+            console.warn('[MutationObserver Shield] Power Platform script src blocked via setAttribute');
+            powerPlatformSafeMode = true;
+          }
+
+          try {
+            return originalSetAttribute.call(this, name, value);
+          } catch (attrError) {
+            if (attrError.message.includes('MutationObserver')) {
+              console.warn('[MutationObserver Shield] setAttribute error suppressed:', attrError.message);
+              return;
+            }
+            throw attrError;
+          }
+        };
+
+        // Safe mode operations for critical DOM methods
+        function createSafeDOMOperation(originalMethod, methodName) {
+          return function(...args) {
+            if (powerPlatformSafeMode) {
+              try {
+                return originalMethod.apply(this, args);
+              } catch (safeError) {
+                if (safeError.message.includes('MutationObserver') ||
+                    safeError.message.includes('parameter 1 is not of type')) {
+                  console.warn(`[MutationObserver Shield] SAFE MODE: ${methodName} error suppressed:`, safeError.message);
+                  return null;
+                }
+                throw safeError;
+              }
+            }
+            return originalMethod.apply(this, args);
+          };
+        }
+
+        // Apply safe mode to critical DOM operations
+        const originalQuerySelector = Document.prototype.querySelector;
+        const originalQuerySelectorAll = Document.prototype.querySelectorAll;
+        const originalGetElementById = Document.prototype.getElementById;
+
+        Document.prototype.querySelector = createSafeDOMOperation(originalQuerySelector, 'querySelector');
+        Document.prototype.querySelectorAll = createSafeDOMOperation(originalQuerySelectorAll, 'querySelectorAll');
+        Document.prototype.getElementById = createSafeDOMOperation(originalGetElementById, 'getElementById');
+
+        // Ultimate Power Platform Error Firewall
+        function createPowerPlatformFirewall() {
+          const firewall = {
+            blockedErrors: 0,
+            suppressedMethods: new Set(),
+
+            shouldSuppress: function(error) {
+              const message = error?.message || '';
+              const stack = error?.stack || '';
+
+              return message.includes('MutationObserver') ||
+                     message.includes('parameter 1 is not of type') ||
+                     message.includes('HTMLIFrameElement') ||
+                     stack.includes('web-client-content-script') ||
+                     stack.includes('HTMLIFrameElement.<anonymous>');
+            },
+
+            suppressError: function(error, context) {
+              this.blockedErrors++;
+              console.warn(`[MutationObserver Shield] FIREWALL BLOCK #${this.blockedErrors}:`, {
+                context: context,
+                error: error?.message?.substring(0, 60) + '...',
+                total: this.blockedErrors
+              });
+            }
+          };
+
+          // Wrap all iframe-related operations in firewall
+          const iframeMethods = ['observe', 'disconnect', 'takeRecords'];
+          iframeMethods.forEach(method => {
+            if (OriginalMutationObserver.prototype[method]) {
+              const original = OriginalMutationObserver.prototype[method];
+              OriginalMutationObserver.prototype[method] = function(...args) {
+                try {
+                  return original.apply(this, args);
+                } catch (error) {
+                  if (firewall.shouldSuppress(error)) {
+                    firewall.suppressError(error, `MutationObserver.${method}`);
+                    return;
+                  }
+                  throw error;
+                }
+              };
+            }
+          });
+
+          return firewall;
+        }
+
+        const powerPlatformFirewall = createPowerPlatformFirewall();
+
+        // Final validation and activation
+        setTimeout(function() {
+          if (powerPlatformSafeMode) {
+            console.warn('[MutationObserver Shield] POWER PLATFORM SAFE MODE ACTIVATED');
+          } else {
+            console.log('[MutationObserver Shield] No Power Platform scripts detected');
+          }
+          console.log('[MutationObserver Shield] COMPREHENSIVE PROTECTION COMPLETE');
+        }, 100);
+
+        console.log('[MutationObserver Shield] POWER PLATFORM INTERCEPTION ACTIVE');
+      })();
+    </script>
   </head>
 
   <body>

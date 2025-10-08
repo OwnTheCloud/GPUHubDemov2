@@ -13,46 +13,72 @@ export function useDuckDBInit() {
 
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout;
 
     async function init() {
+      const startTime = Date.now();
+      console.log('[useDuckDBInit] Starting database initialization...');
+
       try {
-        console.log('Initializing database...');
-        await initializeDB();
-        
-        // Wait a bit to ensure tables are created
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Check if tables are empty and seed if needed
-        const tables = await duckDBManager.getTables();
-        console.log('Available tables:', tables);
-        
-        if (tables.length === 0) {
-          console.error('No tables created! Database initialization failed.');
-          throw new Error('Database tables were not created');
-        }
-        
-        // Check if we have data
-        try {
-          const assets = await queries.assets.getAll();
-          if (assets.length === 0) {
-            console.log('No data found, seeding database...');
-            await seedDatabase();
-            toast({
-              title: "Database Initialized",
-              description: "Sample data has been loaded successfully.",
-            });
+        // Wrap entire initialization in a timeout
+        const initPromise = (async () => {
+          console.log('[useDuckDBInit] Calling initializeDB()...');
+          await initializeDB();
+          console.log('[useDuckDBInit] initializeDB() completed');
+
+          // Wait a bit to ensure tables are created
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          // Check if tables are empty and seed if needed
+          console.log('[useDuckDBInit] Calling getTables()...');
+          const tables = await duckDBManager.getTables();
+          console.log('[useDuckDBInit] getTables() returned:', tables.length, 'tables');
+
+          if (tables.length === 0) {
+            console.error('[useDuckDBInit] No tables created! Database initialization failed.');
+            throw new Error('Database tables were not created');
           }
-        } catch (queryErr) {
-          console.error('Query error, attempting to seed database:', queryErr);
-          await seedDatabase();
-        }
-        
+
+          // Check if we have data
+          console.log('[useDuckDBInit] Checking for existing data...');
+          try {
+            const assets = await queries.assets.getAll();
+            if (assets.length === 0) {
+              console.log('[useDuckDBInit] No data found, seeding database...');
+              await seedDatabase();
+              toast({
+                title: "Database Initialized",
+                description: "Sample data has been loaded successfully.",
+              });
+            } else {
+              console.log('[useDuckDBInit] Found', assets.length, 'existing assets');
+            }
+          } catch (queryErr) {
+            console.error('[useDuckDBInit] Query error, attempting to seed database:', queryErr);
+            await seedDatabase();
+          }
+
+          const duration = Date.now() - startTime;
+          console.log(`[useDuckDBInit] Initialization completed successfully in ${duration}ms`);
+        })();
+
+        // Race against timeout
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error('Database initialization timeout after 10 seconds'));
+          }, 10000);
+        });
+
+        await Promise.race([initPromise, timeoutPromise]);
+
         if (mounted) {
           setIsInitialized(true);
           setError(null);
         }
       } catch (err) {
-        console.error('Failed to initialize database:', err);
+        const duration = Date.now() - startTime;
+        console.error(`[useDuckDBInit] Failed after ${duration}ms:`, err);
+
         if (mounted) {
           setError(err instanceof Error ? err.message : 'Failed to initialize database');
           toast({
@@ -62,8 +88,12 @@ export function useDuckDBInit() {
           });
         }
       } finally {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
         if (mounted) {
           setIsLoading(false);
+          console.log('[useDuckDBInit] Finished - loading set to false');
         }
       }
     }
@@ -72,6 +102,9 @@ export function useDuckDBInit() {
 
     return () => {
       mounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
   }, [toast]);
 

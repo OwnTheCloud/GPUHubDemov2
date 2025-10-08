@@ -17,12 +17,17 @@ class SQLJSManager {
     }
 
     // Start initialization
-    this.initPromise = this.doInitialize();
-    
+    const promise = this.doInitialize();
+    this.initPromise = promise;
+
     try {
-      await this.initPromise;
+      await promise;
     } finally {
-      this.initPromise = null;
+      // Clear promise reference immediately to prevent deadlock
+      // This ensures getTables() called right after won't wait for this promise
+      if (this.initPromise === promise) {
+        this.initPromise = null;
+      }
     }
   }
 
@@ -365,11 +370,60 @@ class SQLJSManager {
   }
 
   // Get all tables in the database
+  // Uses synchronous approach to avoid deadlock with ensureInitialized()
   async getTables(): Promise<string[]> {
-    const result = await this.query<{ name: string }>(
-      "SELECT name FROM sqlite_master WHERE type='table'"
-    );
-    return result.map(row => row.name);
+    console.log('[getTables] Starting - initialized:', this.initialized, 'hasPromise:', !!this.initPromise);
+
+    // If already initialized, skip the wait entirely
+    if (this.initialized && this.db) {
+      console.log('[getTables] Already initialized, proceeding directly');
+      try {
+        const result = this.db.exec("SELECT name FROM sqlite_master WHERE type='table'");
+        const tables = result.length > 0 && result[0]?.values
+          ? result[0].values.map(row => row[0] as string)
+          : [];
+        console.log('[getTables] Found tables:', tables.length);
+        return tables;
+      } catch (error) {
+        console.error('[getTables] Query failed:', error);
+        return [];
+      }
+    }
+
+    // Wait for initialization with timeout protection
+    if (this.initPromise) {
+      console.log('[getTables] Waiting for initialization to complete...');
+      try {
+        await Promise.race([
+          this.initPromise,
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('getTables timeout after 5s')), 5000)
+          )
+        ]);
+        console.log('[getTables] Initialization wait completed');
+      } catch (error) {
+        console.error('[getTables] Timeout or error waiting for init:', error);
+        return [];
+      }
+    }
+
+    if (!this.db) {
+      console.warn('[getTables] Database not available after wait');
+      return [];
+    }
+
+    try {
+      // Use direct exec() to avoid async query() which calls ensureInitialized()
+      const result = this.db.exec("SELECT name FROM sqlite_master WHERE type='table'");
+      const tables = result.length > 0 && result[0]?.values
+        ? result[0].values.map(row => row[0] as string)
+        : [];
+      console.log('[getTables] Retrieved tables:', tables.length);
+      return tables;
+    } catch (error) {
+      console.error('[getTables] Failed to get tables:', error);
+      return [];
+    }
   }
 
   // Export database to file (for debugging/backup)
